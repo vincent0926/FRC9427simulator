@@ -1,0 +1,148 @@
+using System;
+using System.Collections.Generic;
+
+namespace FrcSim
+{
+    // 自動階段(AUTO 20 秒)的起始位置與內建自動路線。純 C#、不依賴 UnityEngine,可以在 Tools/tests 用 dotnet 單元測試。
+    //  · 起始位置:Blue1/2/3、Red1/2/3(駕駛站位置)。藍方 1 號在場地 y 大的一側(藍方駕駛看出去的左手邊),
+    //    紅方是藍方繞場地中心旋轉 180°(場地旋轉對稱),所以 Red n 與 Blue n 互為鏡像。
+    //  · 真實程式模式:站位送進 DriverStation(機器人程式用 DriverStation.getAlliance()/getLocation() 讀到),自動程式由機器人程式自己跑。
+    //  · 內建行為模式 / 第二台機器人:跑這裡的內建路線(倒退到射擊點 → 射完預載 →(1 號)去 DEPOT 吃球 → 回來再射)。
+    public enum AutoStepKind { Drive, Shoot, Collect }
+
+    public class AutoStep
+    {
+        public AutoStepKind Kind;
+        public float X, Y, HeadingDeg;   // 場地座標(WPILib:藍方原點,逆時針為正)
+        public float Timeout;            // 秒
+        public string Name;
+        public AutoStep(AutoStepKind k, float x, float y, float h, float timeout, string name) { Kind = k; X = x; Y = y; HeadingDeg = h; Timeout = timeout; Name = name; }
+    }
+
+    public struct AutoCmd
+    {
+        public float Vx, Vy, Omega;      // 場地座標期望速度(m/s、rad/s)
+        public bool Intake, Shoot, Done;
+        public string Step;
+    }
+
+    public static class AutoPlan
+    {
+        public const float FieldLength = 16.54f, FieldWidth = 8.07f;
+        public const float AllianceZoneDepth = 4.0284f, HubSize = 1.194f, RobotHalf = 0.40f;
+        public const float StartX = AllianceZoneDepth - RobotHalf - 0.05f;   // 保險桿在起始線(聯盟區邊界)後 5 cm
+        public const float ShootX = 2.10f;                                    // 射擊點:離 HUB 約 2.2~2.7 m(查表 2~4 m 有效)
+        public const float DepotY = 5.965f;
+        public static readonly string[] Names = { "blue1", "blue2", "blue3", "red1", "red2", "red3" };
+        public static readonly string[] Labels = { "Blue 1", "Blue 2", "Blue 3", "Red 1", "Red 2", "Red 3" };
+        static readonly float[] BlueStartY = { 6.60f, FieldWidth / 2f, FieldWidth - 6.60f };
+        static readonly float[] BlueShootY = { 5.60f, FieldWidth / 2f, FieldWidth - 5.60f };
+
+        public const int Count = 6;
+        public static bool IsRed(int station) => Clamp(station) >= 3;
+        public static int Number(int station) => Clamp(station) % 3 + 1;
+        public static int Opposite(int station) => (Clamp(station) + 3) % 6;   // 對面聯盟的同號站位(鏡像)
+        public static int Clamp(int station) => station < 0 || station >= Count ? 1 : station;
+        public static int Parse(string name)
+        {
+            int i = Array.IndexOf(Names, (name ?? "").Trim().ToLowerInvariant().Replace(" ", ""));
+            return i;   // 找不到 = -1
+        }
+
+        public static float WrapDeg(float d) { d %= 360f; if (d > 180f) d -= 360f; if (d <= -180f) d += 360f; return d; }
+        public static float WrapRad(float a) { while (a > Math.PI) a -= 2f * (float)Math.PI; while (a < -Math.PI) a += 2f * (float)Math.PI; return a; }
+
+        // 場地中心點對稱(紅 ↔ 藍)
+        public static void Mirror(ref float x, ref float y, ref float headingDeg)
+        {
+            x = FieldLength - x; y = FieldWidth - y; headingDeg = WrapDeg(headingDeg + 180f);
+        }
+
+        public static void HubCenter(bool red, out float x, out float y)
+        {
+            x = AllianceZoneDepth + HubSize / 2f; y = FieldWidth / 2f;
+            if (red) x = FieldLength - x;
+        }
+
+        public static void StartPose(int station, out float x, out float y, out float headingDeg)
+        {
+            station = Clamp(station);
+            x = StartX; y = BlueStartY[station % 3]; headingDeg = 0f;   // 車頭(intake)朝場內
+            if (IsRed(station)) Mirror(ref x, ref y, ref headingDeg);
+        }
+
+        public static List<AutoStep> Routine(int station)
+        {
+            station = Clamp(station);
+            int n = station % 3;
+            float sy = BlueShootY[n];
+            var s = new List<AutoStep>
+            {
+                new AutoStep(AutoStepKind.Drive, ShootX, sy, 0f, 4f, "to-shoot"),
+                new AutoStep(AutoStepKind.Shoot, ShootX, sy, 0f, 4f, "shoot-preload"),
+            };
+            if (n == 0)
+            {
+                // 1 號靠 DEPOT:車頭朝聯盟牆,放下 intake 慢慢開進 DEPOT 吃球,再回射擊點
+                s.Add(new AutoStep(AutoStepKind.Drive, 1.40f, DepotY, 180f, 4f, "to-depot"));
+                s.Add(new AutoStep(AutoStepKind.Collect, 0.62f, DepotY, 180f, 3f, "collect-depot"));
+                s.Add(new AutoStep(AutoStepKind.Drive, ShootX, sy, 0f, 4f, "return"));
+                s.Add(new AutoStep(AutoStepKind.Shoot, ShootX, sy, 0f, 4f, "shoot-depot"));
+            }
+            if (IsRed(station))
+                foreach (var st in s) Mirror(ref st.X, ref st.Y, ref st.HeadingDeg);
+            return s;
+        }
+    }
+
+    // 依序執行路線:P 控制開到每個路徑點(速度、角速度限幅),射擊步驟射到沒球或逾時,Collect 步驟放下 intake 開進去
+    public class AutoRunner
+    {
+        public readonly List<AutoStep> Steps;
+        public int Index { get; private set; }
+        public float StepTime { get; private set; }
+        public bool Done => Index >= Steps.Count;
+        public float MaxSpeed = 2.5f, MaxOmega = 4f;
+        const float Kp = 2.5f, KpTheta = 4f, PosTol = 0.10f, AngTol = 0.08f;
+
+        public AutoRunner(int station) { Steps = AutoPlan.Routine(station); }
+        public AutoStep Current => Done ? null : Steps[Index];
+
+        public AutoCmd Update(float x, float y, float headingRad, int held, float dt)
+        {
+            var cmd = new AutoCmd();
+            if (Done) { cmd.Done = true; cmd.Step = "done"; return cmd; }
+            var st = Steps[Index];
+            StepTime += dt;
+            cmd.Step = st.Name;
+
+            float ex = st.X - x, ey = st.Y - y;
+            float dist = (float)Math.Sqrt(ex * ex + ey * ey);
+            float speed = Math.Min(MaxSpeed, Kp * dist);
+            if (st.Kind == AutoStepKind.Collect) speed = Math.Min(speed, 1.0f);   // 吃球時放慢
+            if (dist > 1e-4f) { cmd.Vx = ex / dist * speed; cmd.Vy = ey / dist * speed; }
+            float eh = AutoPlan.WrapRad(st.HeadingDeg * (float)Math.PI / 180f - headingRad);
+            cmd.Omega = Math.Max(-MaxOmega, Math.Min(MaxOmega, KpTheta * eh));
+            bool arrived = dist < PosTol && Math.Abs(eh) < AngTol;
+
+            switch (st.Kind)
+            {
+                case AutoStepKind.Drive:
+                    if (arrived || StepTime > st.Timeout) Next();
+                    break;
+                case AutoStepKind.Shoot:
+                    cmd.Shoot = true;
+                    if ((held <= 0 && StepTime > 0.3f) || StepTime > st.Timeout) Next();
+                    break;
+                case AutoStepKind.Collect:
+                    cmd.Intake = true;
+                    if ((arrived && StepTime > 1.0f) || StepTime > st.Timeout) Next();
+                    break;
+            }
+            cmd.Done = Done;
+            return cmd;
+        }
+
+        void Next() { Index++; StepTime = 0f; }
+    }
+}

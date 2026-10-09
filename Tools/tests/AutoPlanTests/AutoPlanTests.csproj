@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- AutoPlan.cs 是純 C#(不依賴 UnityEngine),直接連結進來測試:dotnet run (project: Tools/tests/AutoPlanTests) -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../Assets/Scripts/Sim/AutoPlan.cs" Link="AutoPlan.cs" />
+  </ItemGroup>
+</Project>

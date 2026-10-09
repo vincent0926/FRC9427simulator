@@ -10,3 +10,4 @@ Tools/step2glb/node_modules/
 *.sln
 *.log
 Tools/tests/**/bin/
+!Tools/tests/**/*.csproj

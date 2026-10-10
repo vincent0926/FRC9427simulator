@@ -104,10 +104,31 @@ namespace FrcSim
             }
 
             // ---- 真實程式模式的 AUTO 階段:機器人程式自己跑,手把無效(符合真實比賽),提示並可按 N 跳過
-            if (GameSession.Hal != null && GameSession.Hal.Connected && ScoreManager.ClockOn && ScoreManager.MatchTime < 20f)
+            if (GameSession.Hal != null && GameSession.Hal.Connected && ScoreManager.ClockOn && ScoreManager.MatchTime < 20f && !(PreMatch.I != null && PreMatch.I.Active))
             {
                 Panel(new Rect(cx - 280, 90, 560, 30), 0.75f);
                 GUI.Label(new Rect(cx - 280, 93, 560, 26), L($"自動階段({AutoPlan.Labels[GameSession.Station]}):你的機器人程式自己跑,手把暫時無效 — 按 N 跳過", $"AUTO ({AutoPlan.Labels[GameSession.Station]}): your robot code is driving, sticks disabled — press N to skip"), Style(15, new Color(1f, 0.9f, 0.4f), TextAnchor.UpperCenter, FontStyle.Bold));
+            }
+
+            // ---- 真實程式模式的開賽前:選自動程式
+            var pm = PreMatch.I;
+            if (pm != null && pm.Active)
+            {
+                var list = pm.Nt != null ? pm.Nt.Choosers : new System.Collections.Generic.List<NtChooser.Chooser>();
+                float ph = 66 + list.Count * 24;
+                Panel(new Rect(cx - 330, 90, 660, ph), 0.8f);
+                var head = Style(16, new Color(1f, 0.9f, 0.4f), TextAnchor.UpperCenter, FontStyle.Bold);
+                GUI.Label(new Rect(cx - 330, 94, 660, 24), L($"開賽前(Disabled,{AutoPlan.Labels[GameSession.Station]})— Enter / A 開始比賽,{pm.SecondsLeft:0} 秒後自動開始", $"PRE-MATCH (disabled, {AutoPlan.Labels[GameSession.Station]}) — Enter / A to start, auto-start in {pm.SecondsLeft:0}s"), head);
+                if (list.Count == 0)
+                    GUI.Label(new Rect(cx - 330, 120, 660, 22), L("沒找到自動程式選單(SmartDashboard 的 SendableChooser),會跑程式預設的自動", "No auto chooser found on SmartDashboard — the code's default auto will run"), Style(14, dim, TextAnchor.UpperCenter));
+                for (int i = 0; i < list.Count; i++)
+                {
+                    var c = list[i];
+                    string mark = i == Mathf.Clamp(pm.ChooserIndex, 0, list.Count - 1) ? "▶ " : "   ";
+                    GUI.Label(new Rect(cx - 310, 120 + i * 24, 620, 22), $"{mark}{c.Name}:  ◀ {PreMatch.Current(c)} ▶   ({c.Options.Length} {L("個選項", "options")})", Style(15, Color.white));
+                }
+                if (list.Count > 0)
+                    GUI.Label(new Rect(cx - 330, 122 + list.Count * 24, 660, 22), L("[ / ] 或十字鍵左右 換選項   Tab 或十字鍵上下 換選單", "[ / ] or D-pad L/R: option   Tab or D-pad U/D: chooser"), Style(13, dim, TextAnchor.UpperCenter));
             }
 
             // ---- 內建行為的 AUTO 階段:機器人跑內建自動路線(站位 + 目前步驟)

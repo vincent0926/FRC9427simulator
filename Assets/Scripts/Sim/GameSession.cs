@@ -11,7 +11,8 @@ namespace FrcSim
         public static RobotMechanisms Mech;
         public static HalSim Hal;
         public static int Station = 1;          // 玩家的起始站位(AutoPlan.Names:0..2 藍 1~3、3..5 紅 1~3)
-        public static AutoDrive Auto, Auto2;    // 內建自動路線(真實程式模式的玩家機器人沒有,自動程式由 Java 程式跑)
+        public static AutoDrive Auto, Auto2;
+        public static NtChooser Chooser;    // 內建自動路線(真實程式模式的玩家機器人沒有,自動程式由 Java 程式跑)
 
         static readonly Color BlueBody = new Color(0.15f, 0.35f, 0.9f), RedBody = new Color(0.9f, 0.2f, 0.2f);
 
@@ -82,7 +83,7 @@ namespace FrcSim
             Mech.TargetHub = Hub(red);
 
             // 第二台機器人(對面聯盟的同號站位,內建行為;AUTO 跑鏡像的內建自動路線,之後方向鍵操控)
-            Auto = Auto2 = null;
+            Auto = Auto2 = null; Chooser = null;
             if (PlayerPrefs.GetInt("secondRobot", 1) == 1)
             {
                 int st2 = AutoPlan.Opposite(Station);
@@ -126,6 +127,16 @@ namespace FrcSim
             {
                 Hal = robot.AddComponent<HalSim>();
                 Hal.Station = AutoPlan.Names[Station];   // DriverStation 的聯盟/站位:機器人程式的自動程式依此選路線、決定鏡像
+                // 自動程式選單 + 起點位姿(NetworkTables);有比賽計時就先進「開賽前」(Disabled、選自動程式)
+                Chooser = robot.AddComponent<NtChooser>();
+                Chooser.Drive = Drive; Chooser.Station = AutoPlan.Names[Station];
+                AutoPlan.StartPose(Station, out Chooser.StartX, out Chooser.StartY, out Chooser.StartDeg);
+                Chooser.Begin();
+                if (ScoreManager.ClockOn && !LegacyTestRun())
+                {
+                    Hal.Enabled = false;
+                    robot.AddComponent<PreMatch>().Nt = Chooser;
+                }
                 Hal.StartRobot(proj);
                 var ms = robot.AddComponent<MechSim>();
                 ms.Hal = Hal; ms.Drive = Drive; Mech.Sim = ms;
@@ -193,7 +204,7 @@ namespace FrcSim
             if (hud != null) Object.Destroy(hud);
             FuelManager.Clear();
             Hal?.Stop(); Hal = null;
-            Auto = Auto2 = null;
+            Auto = Auto2 = null; Chooser = null;
             Drive = null; Mech = null;
             rig.Target = null;
             rig.Orbit = true;

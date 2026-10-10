@@ -32,6 +32,9 @@ Unity (HalSim.cs / MechSim.cs / NtSim.cs)
 - **真實程式模式**:站位送進 HALSim 的 DriverStation(`>station`),機器人程式用 `DriverStation.getAlliance()` / `getLocation()` 讀得到;比賽時鐘 AUTO 20 秒期間 DS 是 autonomous,跑的是機器人程式自己的自動程式。程式啟動中(還沒連上)時鐘暫停,連上後才從 AUTO 開始。
 - **內建行為模式 / 第二台機器人**:跑 `AutoPlan.cs` 的內建路線(`AutoDrive.cs` 執行):倒退到射擊點 → 射完 8 顆預載;1 號站位再去 DEPOT 吃球、回來再射。AUTO 期間手把無效,按 N 跳過。
 - 內建路線可在設定畫面「內建自動路線」另外選(或 `-routine bystation|preload|depot|neutral|none`):依站位(1 號 DEPOT、其他只射預載)/ 只射預載 / 預載 + DEPOT / 預載 + 中立區(穿過 TRENCH 吃球、在中立區這側射)/ 不動。
+- **開賽前(真實程式模式)**:程式連上後先 Disabled,`NtChooser.cs` 從 NetworkTables 找 SmartDashboard 的自動程式選單(SendableChooser / PathPlanner / AdvantageKit 的 LoggedDashboardChooser 都是 "String Chooser"),畫面上用 [ / ] 或十字鍵換選項、Enter 或 A 開賽(有選單 20 秒、沒有 4 秒後自動開賽)。只會送清單內的選項(送不存在的名稱,`getSelected()` 會回傳 null)。上次選的會記住。
+- **起點位姿**:模擬器在 NetworkTables 發布 `/FRCSim/StartPose`、`/FRCSim/RobotPose`(double[] x, y, 航向度)、`/FRCSim/Station`。機器人程式放 `Tools/sim/robot-example/FrcSimPose.java`,在 autonomousInit 呼叫 `FrcSimPose.startPose().ifPresent(drive::resetPose)`,沒有視覺的機器人自動路線也會從正確的位置開始(上機時沒有值,不影響)。
+- 替身檔 `Tools/sim/overlay/DriveIOSparkMax.java` 有兩種介面版本:專案的 DriveIO 是 `updateInputs(...)` 那種(GitHub 上的 LEO)會自動改用 `overlay/updateInputs/` 的版本。
 - `AutoPlan.cs` 不依賴 UnityEngine,單元測試:`dotnet run --project Tools/tests/AutoPlanTests`(需要 .NET 8 SDK)。
 
 ## 自動測試(皆加 `-batchmode -nographics`)
@@ -39,6 +42,7 @@ Unity (HalSim.cs / MechSim.cs / NtSim.cs)
 |---|---|
 | `-autotest [-station blue1] [-routine neutral]` | 內建自動階段:起始站位、兩台機器人 AUTO 射完預載並得分、AUTO 結束後交還手動(結果 autotest.txt) |
 | `-autotest -fakecode <資料夾>` | 真實程式啟動失敗(資料夾內放一個馬上結束的 gradlew.bat):比賽時鐘不會卡在 AUTO、第二台機器人照常跑自動 |
+| `-realautotest <專案> -station red2 -choose "Drive Forward" -portoffset 50` | 真實程式的自動階段:找到自動程式選單、開賽前 Disabled、程式讀到選的自動程式 / 站位 / 起點(專案需有 "Auto Chooser" 並回報 SimTest/*;範例見報告) |
 | `-padtest -norealcode` | 假手把輸入走一遍:坦克開車、轉向、Intake、發射、車身傾斜 |
 | `-fieldtest` | 隧道、立柱、BUMP 通過與抬升 |
 | `-walltest` | 貼牆、進入 TOWER |

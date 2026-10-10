@@ -112,6 +112,17 @@ namespace FrcSim
                 return;
             }
 
+            {
+                var ra = System.Environment.GetCommandLineArgs(); int rti = System.Array.IndexOf(ra, "-realautotest");
+                if (rti >= 0 && rti + 1 < ra.Length)
+                {
+                    AutoTest.SaveAndOverridePrefs();   // 測試結束會還原
+                    GameSession.Begin(rig, false, ra[rti + 1]);
+                    new GameObject("RealAutoTest").AddComponent<RealAutoTest>();
+                    return;
+                }
+            }
+
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-autotest") >= 0)
             {
                 AutoTest.SaveAndOverridePrefs();   // 測試結束會還原,不改使用者的設定

@@ -14,6 +14,7 @@ namespace FrcSim
             if (Drive == null) return;
             if (auto == null) auto = GetComponent<AutoDrive>();
             if (auto != null && AutoDrive.AutoPhase) return;   // 自動階段:跑內建自動路線
+            if (PreMatch.I != null && PreMatch.I.Active) { Drive.Drive(0f, 0f, 0f); return; }   // 開賽前大家都不動
             if (MenuSystem.Blocking) { Drive.Drive(0f, 0f, 0f); if (Mech != null) Mech.Shooting = false; return; }
 
             float fwd = (Input.GetKey(KeyCode.UpArrow) ? 1f : 0f) - (Input.GetKey(KeyCode.DownArrow) ? 1f : 0f);

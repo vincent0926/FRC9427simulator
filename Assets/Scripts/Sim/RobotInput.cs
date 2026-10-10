@@ -24,6 +24,15 @@ namespace FrcSim
             if (Drive == null) return;
             if (auto == null) auto = GetComponent<AutoDrive>();
             if (auto != null && AutoDrive.AutoPhase) return;   // 內建自動階段:機器人自己跑,手把暫時無效
+            if (PreMatch.I != null && PreMatch.I.Active)
+            {
+                // 開賽前(Disabled):按鍵拿來選自動程式,不送給機器人程式,免得 A(開賽)被當成放下 intake
+                var hp = GameSession.Hal;
+                for (int i = 0; i < 6; i++) { hp.Axes[i] = 0f; hp.Axes2[i] = 0f; }
+                for (int i = 0; i < hp.Buttons.Length; i++) { hp.Buttons[i] = false; hp.Buttons2[i] = false; }
+                hp.Pov2 = -1;
+                return;
+            }
             if (MenuSystem.Blocking)
             {
                 // 選單開著:停下來,不吃遊戲按鍵

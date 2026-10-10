@@ -9,8 +9,8 @@ namespace FrcSim
     // AUTO 期間手把應無效,AUTO 結束後應交還手動。結果寫到 autotest.txt(最後一行 PASS / FAIL)
     public class AutoTest : MonoBehaviour
     {
-        static readonly string[] Keys = { "matchClock", "secondRobot", "useRealCode" };
-        static readonly int[] Test = { 1, 1, 0 };
+        static readonly string[] Keys = { "matchClock", "secondRobot", "useRealCode", "tankMode" };
+        static readonly int[] Test = { 1, 1, 0, 1 };
         static int[] saved; static bool[] had;
 
         public static void SaveAndOverridePrefs()
@@ -18,6 +18,8 @@ namespace FrcSim
             saved = new int[Keys.Length]; had = new bool[Keys.Length];
             for (int i = 0; i < Keys.Length; i++) { had[i] = PlayerPrefs.HasKey(Keys[i]); saved[i] = PlayerPrefs.GetInt(Keys[i], 0); PlayerPrefs.SetInt(Keys[i], Test[i]); }
         }
+
+        public static void RestorePrefsPublic() => RestorePrefs();
 
         static void RestorePrefs()
         {

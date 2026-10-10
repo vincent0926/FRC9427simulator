@@ -65,7 +65,14 @@ namespace FrcSim
                 if (Directory.Exists(ov))
                     foreach (var o in Directory.GetFiles(ov, "*.java"))
                         foreach (var target in Directory.GetFiles(Path.Combine(dst, "src"), Path.GetFileName(o), SearchOption.AllDirectories))
-                            File.Copy(o, target, true);
+                        {
+                            // 同一個替身有不同介面版本:專案的 DriveIO 是 updateInputs(...) 那種,就用 overlay/updateInputs/ 的版本
+                            string src = o;
+                            string io = Path.Combine(Path.GetDirectoryName(target), "DriveIO.java");
+                            string v2 = Path.Combine(ov, "updateInputs", Path.GetFileName(o));
+                            if (File.Exists(v2) && File.Exists(io) && File.ReadAllText(io).Contains("updateInputs(")) src = v2;
+                            File.Copy(src, target, true);
+                        }
             }
             catch (Exception e) { UnityEngine.Debug.LogError("SimProject.Prepare: " + e.Message); return dir; }
             return dst;

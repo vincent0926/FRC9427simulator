@@ -56,7 +56,18 @@ namespace FrcSim
 
         void Start() { AutoStartSeconds = Arg("-prematch", AutoStartSeconds); }
 
-        public void StartMatch() { Done = true; if (GameSession.Hal != null) GameSession.Hal.Enabled = true; }
+        bool startRequested;
+        public bool WaitingForMotors => startRequested && !Done;
+
+        // 要求開賽:等馬達模擬(simagent)開始推資料才真的開始(最多等到連線後 30 秒)
+        public void StartMatch() { startRequested = true; }
+        void StartNow() { Done = true; if (GameSession.Hal != null) GameSession.Hal.Enabled = true; }
+        bool MotorsReady()
+        {
+            var ms = GameSession.Drive != null ? GameSession.Drive.GetComponent<MechSim>() : null;
+            if (ms == null || ms.AgentReady) return true;
+            return connectedAt >= 0f && Time.unscaledTime - connectedAt > 30f;
+        }
 
         void Update()
         {
@@ -64,13 +75,14 @@ namespace FrcSim
             if (Done || hal == null) return;
             if (!hal.Connected)
             {
-                if (!hal.Starting) StartMatch();   // 啟動失敗或斷線:不要卡在準備階段
+                if (!hal.Starting) StartNow();   // 啟動失敗或斷線:不要卡在準備階段
                 else hal.Enabled = false;          // 一連上就先 Disabled
                 return;
             }
             hal.Enabled = false;
             if (connectedAt < 0f && (Nt == null || Nt.Connected)) connectedAt = Time.unscaledTime;   // 倒數從 NetworkTables 連上才開始
-            if (ScoreManager.MatchTime >= 30f) { StartMatch(); return; }   // 按了 N 跳過 AUTO
+            if (ScoreManager.MatchTime >= 30f) { StartNow(); return; }   // 按了 N 跳過 AUTO
+            if (startRequested) { if (MotorsReady()) StartNow(); return; }
 
             var list = Nt != null ? Nt.Choosers : null;
             if (list != null && list.Count > 0)
@@ -108,6 +120,7 @@ namespace FrcSim
             }
             if (!MenuSystem.Blocking && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Pad.Down(Pad.A))) { StartMatch(); return; }
             if (SecondsLeft <= 0f) StartMatch();
+            if (startRequested && MotorsReady()) StartNow();
         }
 
         static string Norm(string s) { var sb = new System.Text.StringBuilder(); foreach (char ch in s.ToLowerInvariant()) if (char.IsLetterOrDigit(ch)) sb.Append(ch); return sb.ToString(); }

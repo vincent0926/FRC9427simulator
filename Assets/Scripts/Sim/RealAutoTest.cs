@@ -51,6 +51,9 @@ namespace FrcSim
             Check(PreMatch.Current(ch) == choice, $"selected '{choice}'");
             Vector2 p0 = d.Pose2d; float h0 = d.HeadingRad;
             PreMatch.I.StartMatch();
+            float tw0 = Time.realtimeSinceStartup;
+            while (PreMatch.I != null && !PreMatch.I.Done && Time.realtimeSinceStartup - tw0 < 40f) yield return null;
+            sb.AppendLine($"waited {Time.realtimeSinceStartup - tw0:0.0} s for motor simulation before AUTO");
             float maxV = 0f, maxVl = 0f; string sample = "";
             var msim0 = d.GetComponent<MechSim>();
             float tw = Time.realtimeSinceStartup;
@@ -80,7 +83,7 @@ namespace FrcSim
                         if (Time.frameCount % 60 == 0 && trace.Length < 4000)
                         {
                             string code = GameSession.Chooser != null && GameSession.Chooser.Arrays.TryGetValue("Field/Robot", out var cp) && cp.Length >= 3 ? $"{cp[0]:0.00},{cp[1]:0.00},{cp[2]:0}" : "-";
-                            trace.Append($"\n  t={ScoreManager.MatchTime:0.0} true=({pp.x:0.00},{pp.y:0.00},{GameSession.Drive.HeadingRad * Mathf.Rad2Deg:0}) code=({code}) v={GameSession.Drive.Speed:0.00}");
+                            trace.Append($"\n  t={ScoreManager.MatchTime:0.0} true=({pp.x:0.00},{pp.y:0.00},{GameSession.Drive.HeadingRad * Mathf.Rad2Deg:0}) code=({code}) v={GameSession.Drive.Speed:0.00} simDriven={GameSession.Drive.SimDriven} target=({GameSession.Drive.SimVelField.x:0.00},{GameSession.Drive.SimVelField.y:0.00}) ms[{(GameSession.Drive.GetComponent<MechSim>() != null ? GameSession.Drive.GetComponent<MechSim>().Debug + " hits=" + GameSession.Drive.GetComponent<MechSim>().ModuleHits + " vel2=" + GameSession.Drive.GetComponent<MechSim>().Vel("Talon FX (v6)[2]").ToString("0") + " steer46=" + GameSession.Drive.GetComponent<MechSim>().Pos("Talon FX (v6)[46]").ToString("0.0") : "none")}]");
                         }
                     }
                     // AUTO 中途截圖(-autoshot 路徑):看機器人有沒有照自動路線動

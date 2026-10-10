@@ -22,7 +22,7 @@ namespace FrcSim
             public double Damping, Lead;
             public double Inertia = 0.002, Friction = 0.01, MinRot = double.NegativeInfinity, MaxRot = double.PositiveInfinity;
         }
-        class Link { public string Sensor, Motor; public double Ratio = 1, Offset; public bool Invert; }
+        class Link { public string Sensor, Motor; public double Ratio = 1, Offset; public bool Invert, HasOffset; }
         class Module { public string Name, Drive, Encoder; public double X, Y; public int UserSign = 1; }
 
         readonly Dictionary<string, Motor> motors = new Dictionary<string, Motor>();
@@ -62,6 +62,11 @@ namespace FrcSim
         [System.Runtime.InteropServices.DllImport("winmm.dll")] static extern uint timeBeginPeriod(uint ms);
 
         bool agentActive;
+        bool followCodePose = true;   // mech.json chassis.followCodePose(預設開)
+        double gyroYawDeg;
+        public bool FollowingCode { get; private set; }
+        // 馬達模擬就緒:agent 在機器人程式啟動約 8 秒後才開始推資料;還沒就緒就開 AUTO,路線(照時間跑)會在車子不能動時就跑掉
+        public bool AgentReady { get { if (!agentActive) return true; lock (agentState) return agentState.Count > 0; } }
         // Java agent 每 ~8ms 經本機 TCP(3399)推來「id 位置 速度 …」一行;HALSim 的回聲更新不可靠,改用這條直連
         readonly Dictionary<int, double[]> agentState = new Dictionary<int, double[]>();
         volatile bool agentStop;
@@ -75,6 +80,7 @@ namespace FrcSim
                     {
                         c.NoDelay = true;
                         c.Connect("127.0.0.1", 3399 + SimPorts.Offset);
+                        agentWriter = new StreamWriter(c.GetStream()) { AutoFlush = true, NewLine = "\n" };
                         using (var rd = new StreamReader(c.GetStream()))
                         {
                             string line;
@@ -92,6 +98,17 @@ namespace FrcSim
             }
         }
         void OnDestroy() { agentStop = true; }
+        volatile StreamWriter agentWriter;   // Unity -> agent:陀螺儀航向(Pigeon2 SimState)
+
+        // 把真實航向寫進機器人程式的 Pigeon2(經 agent)
+        void SendYaw(double deg, double rateDeg)
+        {
+            var w = agentWriter; if (w == null || gyro == null) return;
+            var mm = System.Text.RegularExpressions.Regex.Match(gyro, @"\[(\d+)\]$");
+            if (!mm.Success) return;
+            try { w.WriteLine("yaw " + mm.Groups[1].Value + " " + deg.ToString("R", System.Globalization.CultureInfo.InvariantCulture) + " " + rateDeg.ToString("R", System.Globalization.CultureInfo.InvariantCulture)); }
+            catch { agentWriter = null; }
+        }
         void Start()
         {
             try { timeBeginPeriod(1); } catch { }   // Task.Delay 才能到 ~1ms 精度
@@ -104,7 +121,7 @@ namespace FrcSim
                 {
                     var j = JObject.Parse(File.ReadAllText(MechPath));
                     foreach (var l in (JArray)j["links"] ?? new JArray())
-                        links.Add(new Link { Sensor = (string)l["sensor"], Motor = (string)l["motor"], Ratio = (double?)l["ratio"] ?? 1, Offset = (double?)l["offset"] ?? 0, Invert = (bool?)l["invert"] ?? false });
+                        links.Add(new Link { Sensor = (string)l["sensor"], Motor = (string)l["motor"], Ratio = (double?)l["ratio"] ?? 1, Offset = (double?)l["offset"] ?? 0, Invert = (bool?)l["invert"] ?? false, HasOffset = l["offset"] != null });
                     foreach (var p in (JObject)j["loads"] ?? new JObject()) loads[p.Key] = (JObject)p.Value;
                     foreach (var a in (JArray)j["agentMotors"] ?? new JArray()) agentMotors.Add((string)a);   // 由 Java agent 同進程模擬的馬達,Unity 端不要碰
                     MechCfg = j["mechanisms"] as JObject;
@@ -126,6 +143,7 @@ namespace FrcSim
                     {
                         driveRatio = (double?)ch["driveRatio"] ?? driveRatio;
                         wheelRadius = (double?)ch["wheelRadius"] ?? wheelRadius;
+                        followCodePose = (bool?)ch["followCodePose"] ?? true;
                         angleSign = (double?)ch["angleSign"] ?? 1; omegaSign = (double?)ch["omegaSign"] ?? 1; gyroSign = (double?)ch["gyroSign"] ?? 1;
                         gyro = (string)ch["gyro"];
                         foreach (var m in (JArray)ch["modules"])
@@ -256,9 +274,19 @@ namespace FrcSim
             foreach (var m in modules)
             {
                 if (!motors.TryGetValue(m.Drive, out var mot)) continue;
-                if (!Hal.Devices.TryGetValue("CANEncoder/" + m.Encoder, out var enc) || enc["<position"] == null) continue;
+                double turns;
+                // 設定檔有寫 CANcoder 偏移(= -MagnetOffset)時:程式看到的角度 = 轉向馬達位置 ÷ 轉向齒比,直接算(不等 HALSim 回聲;
+                // 回聲常常沒有或過期,這一幀就被跳過,車子停在原地但程式以為已經在跑路線)
+                Link sl = null; foreach (var l in links) if (l.Sensor == m.Encoder) { sl = l; break; }
+                if (sl != null && sl.HasOffset && motors.TryGetValue(sl.Motor, out var steer))
+                    turns = (steer.Invert ? -steer.Pos : steer.Pos) / sl.Ratio;
+                else
+                {
+                    if (!Hal.Devices.TryGetValue("CANEncoder/" + m.Encoder, out var enc) || enc["<position"] == null) continue;
+                    turns = (double)enc["<position"];
+                }
                 double speed = (m.UserSign * (mot.Vel / (2 * Math.PI)) / driveRatio) * 2 * Math.PI * wheelRadius;
-                double a = angleSign * (double)enc["<position"] * 2 * Math.PI;
+                double a = angleSign * turns * 2 * Math.PI;
                 double vx = speed * Math.Cos(a), vy = speed * Math.Sin(a);
                 n++; svx += vx; svy += vy;
                 srr += m.X * m.X + m.Y * m.Y;
@@ -268,6 +296,33 @@ namespace FrcSim
             if (n < 2) return;
             double cvx = svx / n, cvy = svy / n, omega = omegaSign * srv / (srr == 0 ? 1 : srr);
             Debug = $"chassis v=({cvx:0.00},{cvy:0.00}) w={omega:0.00}";
+
+            // 跟隨模式:車子照「機器人程式自己估的位姿」(SmartDashboard Field2d)走。程式的里程計來自它自己的馬達與運動學,
+            // 和 PathPlanner 規劃的路線一致;模擬器只負責把車開到那個位置(仍有剛體:會推球、會被牆擋)。
+            // 陀螺儀:用模組速度算出的角速度自己積分(不能直接用車子的航向,否則航向和程式互相等待,永遠轉不了)。
+            var nt = GameSession.Chooser;
+            if (followCodePose && Hal.Enabled && nt != null && nt.TryCodePose(out double tx, out double ty, out double tdeg))
+            {
+                gyroYawDeg += omega * Mathf.Rad2Deg * dt;
+                const float tau = 0.1f;
+                Vector2 err = new Vector2((float)tx, (float)ty) - Drive.Pose2d;
+                Vector2 vf = err / tau;
+                if (vf.magnitude > 6f) vf = vf.normalized * 6f;
+                float herr = Mathf.DeltaAngle(Drive.HeadingRad * Mathf.Rad2Deg, (float)tdeg) * Mathf.Deg2Rad;
+                Drive.SimDriven = true;
+                Drive.SimVelField = vf;
+                Drive.SimOmega = Mathf.Clamp(herr / tau, -12f, 12f);
+                Debug += $" follow code=({tx:0.00},{ty:0.00},{tdeg:0}) gyro={gyroYawDeg:0}";
+                FollowingCode = true;
+                if (gyro != null)
+                {
+                    Hal.QueueDevice("CANGyro", gyro, ">rawYawInput", gyroSign * gyroYawDeg, ">angularVelZ", gyroSign * omega * Mathf.Rad2Deg);
+                    SendYaw(gyroSign * gyroYawDeg, gyroSign * omega * Mathf.Rad2Deg);
+                }
+                return;
+            }
+            FollowingCode = false;
+            gyroYawDeg = Drive.HeadingRad * Mathf.Rad2Deg;   // 還沒有程式位姿時,陀螺儀從車子的航向接著積分
 
             // 機器人座標 → 場地座標
             float th = Drive.HeadingRad;
@@ -279,7 +334,10 @@ namespace FrcSim
 
             // 陀螺儀回寫:航向(度)與角速度,讓場向駕駛與里程計閉環
             if (gyro != null)
+            {
                 Hal.QueueDevice("CANGyro", gyro, ">rawYawInput", gyroSign * th * Mathf.Rad2Deg, ">angularVelZ", gyroSign * omega * Mathf.Rad2Deg);
+                SendYaw(gyroSign * th * Mathf.Rad2Deg, gyroSign * omega * Mathf.Rad2Deg);   // Phoenix 6 Pigeon2 要經 agent 寫 SimState
+            }
         }
     }
 }

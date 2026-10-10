@@ -82,6 +82,38 @@ public class SimAgent {
 
     static void log(String s) { System.out.println("[simagent] " + s); }
 
+    static final java.util.Map<Integer, Object[]> pigeons = new java.util.HashMap<>();   // id -> {simState, setRawYaw, setAngularVelocityZ}
+
+    static void readUnity(java.net.Socket s) {
+        try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(s.getInputStream(), "UTF-8"))) {
+            String line;
+            boolean logged = false;
+            while ((line = r.readLine()) != null) {
+                String[] t = line.trim().split("\\s+");
+                if (t.length < 3 || !t[0].equals("yaw")) continue;
+                int id = Integer.parseInt(t[1]);
+                double deg = Double.parseDouble(t[2]), rate = t.length > 3 ? Double.parseDouble(t[3]) : 0;
+                Object[] p = pigeons.get(id);
+                if (p == null) {
+                    ClassLoader cl = ClassLoader.getSystemClassLoader();
+                    Class<?> pc = Class.forName("com.ctre.phoenix6.hardware.Pigeon2", true, cl);
+                    Object pig = pc.getConstructor(int.class).newInstance(id);
+                    Object sim = pc.getMethod("getSimState").invoke(pig);
+                    Method yawM = sim.getClass().getMethod("setRawYaw", double.class);
+                    Method rateM = null;
+                    try { rateM = sim.getClass().getMethod("setAngularVelocityZ", double.class); } catch (NoSuchMethodException e) { }
+                    try { sim.getClass().getMethod("setSupplyVoltage", double.class).invoke(sim, 12.0); } catch (Throwable e) { }
+                    p = new Object[] { sim, yawM, rateM };
+                    pigeons.put(id, p);
+                    log("pigeon2 id=" + id + " driven by Unity heading");
+                }
+                ((Method) p[1]).invoke(p[0], deg);
+                if (p[2] != null) ((Method) p[2]).invoke(p[0], rate);
+                if (!logged) { logged = true; log("first yaw " + deg); }
+            }
+        } catch (Throwable e) { log("unity reader stopped: " + e); }
+    }
+
     static volatile java.io.PrintWriter client;
 
     // 本機 TCP(127.0.0.1:3399):把每顆馬達的轉子位置/速度直接推給 Unity(HALSim 的回聲更新不可靠、會過期)
@@ -93,6 +125,12 @@ public class SimAgent {
                     s.setTcpNoDelay(true);
                     client = new java.io.PrintWriter(new java.io.OutputStreamWriter(s.getOutputStream(), "UTF-8"), false);
                     log("Unity connected");
+                    // Unity -> agent:每行 "yaw <Pigeon2 CAN id> <度> <度/秒>",寫進 Pigeon2 的 SimState
+                    // (Phoenix 6 的 Pigeon2 不吃 HALSim 的 CANGyro 輸入;沒有這個,機器人程式的陀螺儀永遠不轉,場向控制全錯)
+                    final java.net.Socket sock = s;
+                    Thread rd = new Thread(() -> readUnity(sock), "simagent-rd");
+                    rd.setDaemon(true);
+                    rd.start();
                 }
             } catch (Throwable e) { log("server failed: " + e); }
         }, "simagent-srv");

@@ -41,6 +41,11 @@ Unity (HalSim.cs / MechSim.cs / NtSim.cs)
 - 主選單 → 開始 → 「自動模式(跑你自己寫的自動)」:選機器人程式專案、站位 → 開賽前選你程式的自動程式 → 只跑 AUTO 20 秒(+3 秒計分寬限)→ 顯示 AUTO 得分;Enter / A 再跑一次、Esc 回主選單。
 - 直接用選的專案執行(不受「坦克模式只跑坦克專案」限制)。
 
+## 真實程式的 swerve:跟隨程式位姿
+- 機器人程式在 SmartDashboard 放 Field2d(例如 `SmartDashboard.putData("Field", field)`)時,模擬器的車會照「程式自己估的位姿」(`Field/Robot`)開:程式的里程計來自它自己的馬達與運動學,所以 PathPlanner 路線會照預覽跑;車子仍是剛體(推球、被牆擋)。設定檔 `chassis.followCodePose: false` 可關閉,改用馬達速度推算(實驗中)。
+- 開賽前會等 simagent 開始推馬達資料(機器人程式啟動後約 8 秒)才開始 AUTO,否則照時間跑的路線會在車子還不能動時就跑掉。
+- Phoenix 6 的 Pigeon2 不吃 HALSim 輸入:航向經 simagent 寫進 Pigeon2 SimState(Unity → agent 的 TCP 行 `yaw <id> <度> <度/秒>`)。
+
 ## 內建射擊
 - 4 m 以內用機器人程式的查表(ShooterCalc);超過 4 m(過中線的遠射)固定 hood 20°,用彈道解(重力 + 0.375 線性阻力、60 Hz,和球的物理一致)算出剛好落進 HUB 中心的球速。`-shottest`:自己聯盟區到過中線 6 m,每點 8 顆全進。
 

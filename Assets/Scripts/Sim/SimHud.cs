@@ -133,6 +133,11 @@ namespace FrcSim
                 }
                 if (list.Count > 0)
                     GUI.Label(new Rect(cx - 330, 122 + list.Count * 24, 660, 22), L("[ / ] 或十字鍵左右 換選項   Tab 或十字鍵上下 換選單", "[ / ] or D-pad L/R: option   Tab or D-pad U/D: chooser"), Style(13, dim, TextAnchor.UpperCenter));
+                if (pm.WaitingForMotors)
+                {
+                    Panel(new Rect(cx - 330, 120 + ph, 660, 26), 0.8f);
+                    GUI.Label(new Rect(cx - 330, 123 + ph, 660, 22), L("等待馬達模擬就緒…(機器人程式啟動後約 10 秒)", "Waiting for motor simulation… (~10 s after the robot code starts)"), Style(14, new Color(1f, 0.9f, 0.4f), TextAnchor.UpperCenter));
+                }
                 if (pm.StartInfo != "")
                 {
                     Panel(new Rect(cx - 330, 92 + ph, 660, 26), 0.8f);

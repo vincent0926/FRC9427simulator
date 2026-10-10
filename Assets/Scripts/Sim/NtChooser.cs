@@ -30,6 +30,21 @@ namespace FrcSim
         public string Status = "idle";
         public volatile bool Connected;
         public readonly ConcurrentDictionary<string, string> Strings = new ConcurrentDictionary<string, string>();
+        public volatile float CodePoseStampF;
+        long codePoseStamp; public long CodePoseStamp { get => System.Threading.Interlocked.Read(ref codePoseStamp); set => System.Threading.Interlocked.Exchange(ref codePoseStamp, value); }
+        public long NowMs => clock.ElapsedMilliseconds;
+        // 程式自己估的位姿(Field2d "Field/Robot" 或任何 "<名稱>/Robot":{x, y, 度});超過 maxAgeMs 沒更新就當沒有
+        public bool TryCodePose(out double x, out double y, out double deg, long maxAgeMs = 500)
+        {
+            x = y = deg = 0;
+            if (NowMs - CodePoseStamp > maxAgeMs) return false;
+            double[] best = null;
+            if (!Arrays.TryGetValue("Field/Robot", out best))
+                foreach (var kv in Arrays) if (kv.Key.EndsWith("/Robot") && kv.Value.Length >= 3) { best = kv.Value; break; }
+            if (best == null || best.Length < 3) return false;
+            x = best[0]; y = best[1]; deg = best[2];
+            return true;
+        }
         public readonly ConcurrentDictionary<string, double[]> Arrays = new ConcurrentDictionary<string, double[]>();   // 例如 Field/Robot = 程式自己估的位姿 {x, y, 度}
 
         readonly ConcurrentDictionary<string, Chooser> choosers = new ConcurrentDictionary<string, Chooser>();
@@ -89,7 +104,7 @@ namespace FrcSim
                     try { await ws.ConnectAsync(new Uri("ws://127.0.0.1:5810/nt/frcsim-chooser"), ct); }
                     catch { await Task.Delay(1500, ct); continue; }
                     pubs.Clear(); topicById.Clear(); Connected = true; Status = "connected";
-                    var subs = new JArray(new JObject { ["method"] = "subscribe", ["params"] = new JObject { ["topics"] = new JArray("/SmartDashboard/"), ["subuid"] = 11, ["options"] = new JObject { ["prefix"] = true, ["periodic"] = 0.1 } } });
+                    var subs = new JArray(new JObject { ["method"] = "subscribe", ["params"] = new JObject { ["topics"] = new JArray("/SmartDashboard/"), ["subuid"] = 11, ["options"] = new JObject { ["prefix"] = true, ["periodic"] = 0.02 } } });
                     await SendText(subs.ToString(Newtonsoft.Json.Formatting.None), ct);
                     await SendBinary(TimeSync(), ct);
                     var recv = Task.Run(() => ReceiveLoop(ct));
@@ -178,6 +193,7 @@ namespace FrcSim
                 var dv = new double[arr.Length];
                 for (int i = 0; i < arr.Length; i++) dv[i] = Convert.ToDouble(arr[i]);
                 Arrays[topic.Substring(Root.Length)] = dv;
+                if (topic.EndsWith("/Robot")) CodePoseStamp = clock.ElapsedMilliseconds;
             }
             int slash = topic.LastIndexOf('/');
             if (slash <= Root.Length) return;

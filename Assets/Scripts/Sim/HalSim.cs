@@ -212,7 +212,7 @@ namespace FrcSim
                 string gradlew = Path.Combine(ProjectDir, "gradlew.bat");
                 if (!File.Exists(gradlew)) { Status = "gradlew.bat not found in project"; return; }
 
-                var psi = new ProcessStartInfo(gradlew, "simulateJava --offline -I \"" + init + "\"")
+                var psi = new ProcessStartInfo(gradlew, "simulateJava --offline -Dorg.gradle.daemon.idletimeout=120000 -I \"" + init + "\"")   // daemon 閒置 2 分鐘就結束:它也載入了 simagent.jar,原本會留著約 3 小時(佔記憶體、鎖住檔案讓更新失敗)
                 {
                     WorkingDirectory = ProjectDir,
                     UseShellExecute = false,

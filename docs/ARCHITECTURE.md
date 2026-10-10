@@ -37,6 +37,7 @@ Unity (HalSim.cs / MechSim.cs / NtSim.cs)
 | 參數 | 內容 |
 |---|---|
 | `-autotest [-station blue1]` | 內建自動階段:起始站位、兩台機器人 AUTO 射完預載並得分、AUTO 結束後交還手動(結果 autotest.txt) |
+| `-autotest -fakecode <資料夾>` | 真實程式啟動失敗(資料夾內放一個馬上結束的 gradlew.bat):比賽時鐘不會卡在 AUTO、第二台機器人照常跑自動 |
 | `-padtest -norealcode` | 假手把輸入走一遍:坦克開車、轉向、Intake、發射、車身傾斜 |
 | `-fieldtest` | 隧道、立柱、BUMP 通過與抬升 |
 | `-walltest` | 貼牆、進入 TOWER |

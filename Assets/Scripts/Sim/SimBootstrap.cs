@@ -115,7 +115,8 @@ namespace FrcSim
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-autotest") >= 0)
             {
                 AutoTest.SaveAndOverridePrefs();   // 測試結束會還原,不改使用者的設定
-                GameSession.Begin(rig);
+                var aa = System.Environment.GetCommandLineArgs(); int fi = System.Array.IndexOf(aa, "-fakecode");
+                GameSession.Begin(rig, false, fi >= 0 && fi + 1 < aa.Length ? aa[fi + 1] : null);   // -fakecode <資料夾>:模擬「真實程式啟動失敗」
                 new GameObject("AutoTest").AddComponent<AutoTest>();
                 return;
             }

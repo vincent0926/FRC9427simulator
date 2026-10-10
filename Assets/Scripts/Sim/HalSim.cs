@@ -145,6 +145,8 @@ namespace FrcSim
         string logPath;
 
         public bool Connected => ws != null && ws.State == WebSocketState.Open;
+        // 還在啟動(編譯/等連線)中;失敗(找不到 gradlew、程式結束、連不上、斷線)就不算,比賽時鐘不再等它
+        public bool Starting { get { var s = Status; return !Connected && (s == "idle" || s == "starting robot code" || s == "compiling/starting robot"); } }
 
         void Awake() { I = this; }
 

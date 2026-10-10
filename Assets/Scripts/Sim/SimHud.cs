@@ -72,7 +72,7 @@ namespace FrcSim
             lines.Add($"{Drive.Speed:0.0} m/s   {L("朝向", "hdg")} {Drive.HeadingRad * Mathf.Rad2Deg:0}°   FPS {fps:0}");
             if (Mech != null)
             {
-                lines.Add($"{L("持球", "Fuel")} {Mech.Held}/{RobotMechanisms.Capacity}   {L("吸球器", "intake")} {(Mech.IntakeDown ? L("放下", "DOWN") : L("收起", "up"))}   {L("球道", "chute")} {HumanPlayer.BlueChute}(H)");
+                lines.Add($"{L("持球", "Fuel")} {Mech.Held}/{RobotMechanisms.Capacity}   {L("吸球器", "intake")} {(Mech.IntakeDown ? L("放下", "DOWN") : L("收起", "up"))}   {L("球道", "chute")} {(AutoPlan.IsRed(GameSession.Station) ? HumanPlayer.RedChute : HumanPlayer.BlueChute)}(H)");
                 lines.Add($"{L("飛輪", "flywheel")} {Mech.FlywheelRps:0} rps   {(Mech.Shooting ? (Mech.Ready ? L("發射中", "firing") : L("加速中…", "spinning up…")) : L("待機", "idle"))}   {L("已射", "shots")} {Mech.ShotsFired}");
             }
             if (showDebug)
@@ -119,7 +119,13 @@ namespace FrcSim
             }
 
             // ---- 真實程式啟動中提示
-            if (GameSession.Hal != null && !GameSession.Hal.Connected)
+            if (GameSession.Hal != null && !GameSession.Hal.Connected && !GameSession.Hal.Starting)
+            {
+                Panel(new Rect(cx - 260, H * 0.42f, 520, 54), 0.75f);
+                GUI.Label(new Rect(cx - 260, H * 0.42f + 6, 520, 24), L("機器人程式沒有連上,改用內建操控", "Robot code not connected — using built-in controls"), Style(20, Color.white, TextAnchor.UpperCenter, FontStyle.Bold));
+                GUI.Label(new Rect(cx - 260, H * 0.42f + 30, 520, 22), GameSession.Hal.Status, Style(13, dim, TextAnchor.UpperCenter));
+            }
+            else if (GameSession.Hal != null && !GameSession.Hal.Connected)
             {
                 Panel(new Rect(cx - 260, H * 0.42f, 520, 54), 0.75f);
                 GUI.Label(new Rect(cx - 260, H * 0.42f + 6, 520, 24), L("機器人程式啟動中…", "Starting robot code…"), Style(20, Color.white, TextAnchor.UpperCenter, FontStyle.Bold));

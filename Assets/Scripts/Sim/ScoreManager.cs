@@ -16,7 +16,7 @@ namespace FrcSim
         public static bool BlueWonAuto;                // AUTO 得分較多者(同分:藍方)
         public static string Phase = "AUTO";
         public static bool BlueActive = true, RedActive = true, Ended;
-        public static bool WaitingForCode => GameSession.Hal != null && !GameSession.Hal.Connected;   // 真實程式啟動中:時鐘暫停
+        public static bool WaitingForCode => GameSession.Hal != null && GameSession.Hal.Starting;   // 真實程式啟動中:時鐘暫停(啟動失敗就照常計時)
         public static float TimeLeft => Mathf.Max(0f, 160f - MatchTime);
 
         static void UpdateClock()

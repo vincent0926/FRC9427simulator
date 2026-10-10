@@ -33,6 +33,22 @@ namespace FrcSim
             void Check(bool c, string msg) { sb.AppendLine((c ? "ok   " : "FAIL ") + msg); ok &= c; }
 
             yield return null;   // 第一幀:還沒開始移動前先檢查起點
+            if (GameSession.Hal != null)
+            {
+                // -fakecode:機器人程式一啟動就結束 → 比賽時鐘不能永遠停在 AUTO,第二台機器人照樣跑自動
+                float w0 = Time.time;
+                while (GameSession.Hal.Starting && Time.time - w0 < 30f) yield return null;
+                sb.AppendLine("robot code status: " + GameSession.Hal.Status);
+                Check(!GameSession.Hal.Starting && !GameSession.Hal.Connected, "failed robot code is detected (not 'starting' forever)");
+                float m0 = ScoreManager.MatchTime;
+                yield return new WaitForSeconds(5f);
+                Check(ScoreManager.MatchTime - m0 > 4f, $"match clock runs after robot code failed ({m0:0.0} -> {ScoreManager.MatchTime:0.0})");
+                Check(GameSession.Auto2 != null && (GameSession.Auto2.Running || GameSession.Auto2.StepName != "to-shoot"), "robot2 runs its auto");
+                File.WriteAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), "autotest.txt"), sb.ToString() + (ok ? "PASS" : "FAIL") + "\n");
+                RestorePrefs();
+                Application.Quit();
+                yield break;
+            }
             var d = GameSession.Drive; var m = GameSession.Mech;
             var a1 = GameSession.Auto; var a2 = GameSession.Auto2;
             Check(a1 != null && a2 != null, "both robots have AutoDrive");

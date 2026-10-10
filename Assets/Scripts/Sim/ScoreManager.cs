@@ -32,6 +32,13 @@ namespace FrcSim
             if (!ClockOn) { Phase = "FREE PLAY"; BlueActive = RedActive = true; Ended = false; return; }
             float t = MatchTime;
             if (t < 20f) { Phase = "AUTO"; BlueActive = RedActive = true; BlueWonAuto = BlueScore >= RedScore; return; }
+            if (GameSession.AutoOnly)
+            {
+                // 自動模式:AUTO 結束後 3 秒計分寬限(空中的球還算),然後結束;機器人 Disabled
+                if (GameSession.Hal != null) GameSession.Hal.Enabled = false;
+                if (t < 23f) { Phase = "SCORING GRACE"; BlueActive = RedActive = true; return; }
+                Phase = "AUTO DONE"; BlueActive = RedActive = false; Ended = true; return;
+            }
             if (t < 30f) { Phase = "TRANSITION"; BlueActive = RedActive = true; return; }
             if (t < 130f)
             {
@@ -55,7 +62,7 @@ namespace FrcSim
         {
             BlueScore = RedScore = 0; BlueAuto = RedAuto = 0;
             MatchTime = 0f; Ended = false; BlueWonAuto = true;
-            ClockOn = PlayerPrefs.GetInt("matchClock", 1) == 1 && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-noclock") < 0;
+            ClockOn = GameSession.AutoOnly || (PlayerPrefs.GetInt("matchClock", 1) == 1 && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-noclock") < 0);
             float L = SimConstants.FieldLength, W = SimConstants.FieldWidth;
             float d = SimConstants.AllianceZoneDepth + SimConstants.HubSize / 2f;
             blueHub = new Vector2(d, W / 2f);
@@ -87,7 +94,7 @@ namespace FrcSim
                 if (!inBlue && !inRed) continue;
 
                 bool active = inBlue ? BlueActive : RedActive;
-                if (active) { if (inBlue) BlueScore++; else RedScore++; if (Phase == "AUTO") { if (inBlue) BlueAuto++; else RedAuto++; } }
+                if (active) { if (inBlue) BlueScore++; else RedScore++; if (Phase == "AUTO" || (GameSession.AutoOnly && Phase == "SCORING GRACE")) { if (inBlue) BlueAuto++; else RedAuto++; } }
                 // 吐回場上:朝中立區那一側的底部出口
                 Vector2 hub = inBlue ? blueHub : redHub;
                 float dir = inBlue ? 1f : -1f;

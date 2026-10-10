@@ -26,6 +26,7 @@ namespace FrcSim
                 case "END GAME": return "終局";
                 case "SCORING GRACE": return "計分寬限";
                 case "MATCH OVER": return "比賽結束";
+                case "AUTO DONE": return "自動模式結束";
                 case "FREE PLAY": return "自由練習";
                 default: return p;
             }
@@ -35,6 +36,9 @@ namespace FrcSim
 
         void Update()
         {
+            // 自動模式結束:Enter / A 同樣設定再跑一次
+            if (GameSession.AutoOnly && ScoreManager.Ended && !MenuSystem.Blocking && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Pad.Down(Pad.A)) && Rig != null)
+            { GameSession.Restart(Rig); return; }
             fps = Mathf.Lerp(fps, 1f / Mathf.Max(Time.unscaledDeltaTime, 1e-4f), 0.05f);
             if (Input.GetKeyDown(KeyCode.F3)) showDebug = !showDebug;
             if (Input.GetKeyDown(KeyCode.F1)) { showHelp = !showHelp; born = showHelp ? Time.unscaledTime - 9999f : Time.unscaledTime - 9999f; }
@@ -140,7 +144,18 @@ namespace FrcSim
             }
 
             // ---- 比賽結束成績單:AUTO / TELEOP / 總分、勝負
-            if (ScoreManager.ClockOn && ScoreManager.Ended)
+            if (ScoreManager.ClockOn && ScoreManager.Ended && GameSession.AutoOnly)
+            {
+                Panel(new Rect(cx - 240, H * 0.30f, 480, 150), 0.85f);
+                GUI.Label(new Rect(cx - 240, H * 0.30f + 10, 480, 34), L("自動模式結束", "AUTO FINISHED"), Style(26, new Color(1f, 0.9f, 0.4f), TextAnchor.UpperCenter, FontStyle.Bold));
+                bool me = AutoPlan.IsRed(GameSession.Station);
+                int mine = me ? ScoreManager.RedAuto : ScoreManager.BlueAuto;
+                GUI.Label(new Rect(cx - 240, H * 0.30f + 52, 480, 26), L($"你的 AUTO 得分:{mine}   (藍 {ScoreManager.BlueAuto} : 紅 {ScoreManager.RedAuto})", $"Your AUTO points: {mine}   (blue {ScoreManager.BlueAuto} : red {ScoreManager.RedAuto})"), Style(18, Color.white, TextAnchor.UpperCenter, FontStyle.Bold));
+                if (GameSession.Chooser != null)
+                    foreach (var c in GameSession.Chooser.Choosers) { GUI.Label(new Rect(cx - 240, H * 0.30f + 82, 480, 22), L("跑的自動程式:", "Auto: ") + PreMatch.Current(c), Style(15, dim, TextAnchor.UpperCenter)); break; }
+                GUI.Label(new Rect(cx - 240, H * 0.30f + 110, 480, 24), L("Enter / A 再跑一次     Esc 回主選單", "Enter / A run again     Esc main menu"), Style(15, dim, TextAnchor.UpperCenter));
+            }
+            else if (ScoreManager.ClockOn && ScoreManager.Ended)
             {
                 int bt = ScoreManager.BlueScore - ScoreManager.BlueAuto, rt = ScoreManager.RedScore - ScoreManager.RedAuto;
                 string win = ScoreManager.BlueScore > ScoreManager.RedScore ? L("藍方獲勝", "BLUE WINS") : ScoreManager.RedScore > ScoreManager.BlueScore ? L("紅方獲勝", "RED WINS") : L("平手", "TIE");

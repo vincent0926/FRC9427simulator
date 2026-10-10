@@ -167,7 +167,7 @@ namespace FrcSim
         void OnDestroy() { Stop(); if (I == this) I = null; }
         void OnApplicationQuit() { Stop(); }
 
-        static Process pendingKill;
+        static Process pendingKill, pendingTaskkill;
         StreamWriter logWriter;   // 結束時要關掉:原本一直開著,同一次執行裡第二場比賽就開不了這個 log 檔(Sharing violation)
 
         public void Stop()
@@ -180,8 +180,8 @@ namespace FrcSim
                 if (gradle != null && !gradle.HasExited)
                 {
                     // 連同子程序(gradle daemon 啟動的 java)一起結束
-                    var k = Process.Start(new ProcessStartInfo("taskkill", "/PID " + gradle.Id + " /T /F") { CreateNoWindow = true, UseShellExecute = false });
-                    k?.WaitForExit(3000);
+                    // 不在主執行緒等它結束(原本 WaitForExit 會讓畫面卡約 0.5 秒);下一場開始前在背景等
+                    pendingTaskkill = Process.Start(new ProcessStartInfo("taskkill", "/PID " + gradle.Id + " /T /F") { CreateNoWindow = true, UseShellExecute = false });
                 }
             }
             catch { }
@@ -202,6 +202,7 @@ namespace FrcSim
             {
                 Status = "starting robot code";
                 // 上一場的機器人程式還在關:等它結束(最多 15 秒),不然新程式開不了 log 檔、HALSim 連線埠也被佔住
+                try { var tk = pendingTaskkill; if (tk != null && !tk.HasExited) tk.WaitForExit(5000); } catch { }
                 try { var pk = pendingKill; if (pk != null && !pk.HasExited) pk.WaitForExit(15000); } catch { }
                 logPath = Path.Combine(Path.GetTempPath(), SimPorts.Offset != 0 ? "frc9427-sim-robot-p" + SimPorts.Offset + ".log" : "frc9427-sim-robot.log");
                 string init = Path.Combine(Path.GetTempPath(), "frc9427-enable-ws.init.gradle");

@@ -127,11 +127,22 @@ namespace FrcSim
             TargetDistance = res.Distance;
             float desiredTurret = Wrap(res.FieldAngle - heading);
 
-            float flyTarget = Shooting ? res.FlywheelRps : 0f;
+            // 查表只到約 4 m(超過就夾在表尾,球會掉在 HUB 前面):遠射改用彈道解,固定 hood、算出剛好落進 HUB 中心的球速
+            float tableRps = res.FlywheelRps, tableHood = res.HoodDeg;
+            if (res.Distance > LongShotFrom)
+            {
+                tableHood = LongShotHood;
+                Vector2 hub = new Vector2(TargetHub.x < SimConstants.FieldLength / 2f ? HubCenterX : SimConstants.FieldLength - HubCenterX, TargetHub.y);
+                float c0 = Mathf.Cos(heading), s0 = Mathf.Sin(heading);
+                Vector2 launch = pos + new Vector2(ShooterCalc.TurretOffset.x * c0, ShooterCalc.TurretOffset.x * s0);
+                float speed = SolveSpeed(Vector2.Distance(launch, hub), (71f - 0.75f * LongShotHood) * Mathf.Deg2Rad);
+                tableRps = Mathf.Max(0f, (speed - 2.0f) / 0.14f);   // Fire():球速 = 0.14 × rps + 2.0
+            }
+            float flyTarget = Shooting ? tableRps : 0f;
             if (FlywheelRps < flyTarget) FlywheelRps = Mathf.Min(flyTarget, FlywheelRps + FlywheelAccel * dt);
             else FlywheelRps = Mathf.Max(flyTarget, FlywheelRps - (Shooting ? FlywheelAccel : FlywheelCoast) * dt);
 
-            float hoodTarget = Shooting ? Mathf.Clamp(res.HoodDeg, 1f, 45f) : 1f;
+            float hoodTarget = Shooting ? Mathf.Clamp(tableHood, 1f, 45f) : 1f;
             HoodDeg = Mathf.MoveTowards(HoodDeg, hoodTarget, HoodSpeed * dt);
 
             if (Shooting)
@@ -142,7 +153,7 @@ namespace FrcSim
             if (TurretVisual != null) TurretVisual.localRotation = Quaternion.Euler(0f, -TurretRad * Mathf.Rad2Deg, 0f);
 
             Ready = Shooting
-                && Mathf.Abs(FlywheelRps - res.FlywheelRps) <= 3f
+                && Mathf.Abs(FlywheelRps - tableRps) <= 3f
                 && Mathf.Abs(HoodDeg - hoodTarget) < 2f
                 && Mathf.Abs(Wrap(desiredTurret - TurretRad)) < 0.05f;
 
@@ -151,6 +162,40 @@ namespace FrcSim
                 Fire(pos, heading);
                 nextFire = Time.time + ShootInterval;
             }
+        }
+
+        public const float LongShotFrom = 4.0f;       // 超過這個距離改用彈道解
+        const float LongShotHood = 20f;               // 遠射固定 hood(查表最遠那格),仰角 = 71 - 0.75 × 20 = 56°
+        const float HubCenterX = 4.6254f;             // HUB 開口中心(聯盟區深度 + 半個 HUB);計分用的是這個
+        const float HubTargetY = 1.72f;               // 球往下掉經過的高度(計分帶 1.62~1.80 m)
+
+        // 給定仰角,找出讓球「往下掉經過 HubTargetY 時」水平距離剛好是 dist 的球速。
+        // 和 Unity 物理一樣:60 Hz、重力 9.81、linearDamping 0.375(每步 v /= 1 + 0.375·dt)。
+        public static float SolveSpeed(float dist, float elev)
+        {
+            float lo = 3f, hi = 30f;
+            for (int it = 0; it < 30; it++)
+            {
+                float mid = (lo + hi) * 0.5f;
+                float reach = Reach(mid, elev);
+                if (reach < dist) lo = mid; else hi = mid;
+            }
+            return (lo + hi) * 0.5f;
+        }
+
+        static float Reach(float speed, float elev)
+        {
+            const float dt = 1f / 60f, g = 9.81f, damp = 0.375f;
+            float x = 0f, y = LaunchHeight, vx = Mathf.Cos(elev) * speed, vy = Mathf.Sin(elev) * speed;
+            for (int i = 0; i < 600; i++)
+            {
+                vy -= g * dt;
+                float k = 1f / (1f + damp * dt); vx *= k; vy *= k;
+                float py = y;
+                x += vx * dt; y += vy * dt;
+                if (vy < 0f && py >= HubTargetY && y < HubTargetY) return x;
+            }
+            return -1f;   // 球速太低,根本到不了那個高度
         }
 
         void Collect()

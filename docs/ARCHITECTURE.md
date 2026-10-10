@@ -37,12 +37,21 @@ Unity (HalSim.cs / MechSim.cs / NtSim.cs)
 - 替身檔 `Tools/sim/overlay/DriveIOSparkMax.java` 有兩種介面版本:專案的 DriveIO 是 `updateInputs(...)` 那種(GitHub 上的 LEO)會自動改用 `overlay/updateInputs/` 的版本。
 - `AutoPlan.cs` 不依賴 UnityEngine,單元測試:`dotnet run --project Tools/tests/AutoPlanTests`(需要 .NET 8 SDK)。
 
+## 自動模式(遊戲模式選單)
+- 主選單 → 開始 → 「自動模式(跑你自己寫的自動)」:選機器人程式專案、站位 → 開賽前選你程式的自動程式 → 只跑 AUTO 20 秒(+3 秒計分寬限)→ 顯示 AUTO 得分;Enter / A 再跑一次、Esc 回主選單。
+- 直接用選的專案執行(不受「坦克模式只跑坦克專案」限制)。
+
+## 內建射擊
+- 4 m 以內用機器人程式的查表(ShooterCalc);超過 4 m(過中線的遠射)固定 hood 20°,用彈道解(重力 + 0.375 線性阻力、60 Hz,和球的物理一致)算出剛好落進 HUB 中心的球速。`-shottest`:自己聯盟區到過中線 6 m,每點 8 顆全進。
+
 ## 自動測試(皆加 `-batchmode -nographics`)
 | 參數 | 內容 |
 |---|---|
 | `-autotest [-station blue1] [-routine neutral]` | 內建自動階段:起始站位、兩台機器人 AUTO 射完預載並得分、AUTO 結束後交還手動(結果 autotest.txt) |
 | `-autotest -fakecode <資料夾>` | 真實程式啟動失敗(資料夾內放一個馬上結束的 gradlew.bat):比賽時鐘不會卡在 AUTO、第二台機器人照常跑自動 |
 | `-realautotest <專案> -station red2 -choose "Drive Forward" -portoffset 50` | 真實程式的自動階段:找到自動程式選單、開賽前 Disabled、程式讀到選的自動程式 / 站位 / 起點(專案需有 "Auto Chooser" 並回報 SimTest/*;範例見報告) |
+| `-shottest` | 內建射擊命中率:x 2.2~10 m 各點射 8 顆(結果 shottest.txt) |
+| `-realautotest <專案> -automode ...` | 自動模式:AUTO 結束後停、Disabled,再跑一次程式能重新連上 |
 | `-padtest -norealcode` | 假手把輸入走一遍:坦克開車、轉向、Intake、發射、車身傾斜 |
 | `-fieldtest` | 隧道、立柱、BUMP 通過與抬升 |
 | `-walltest` | 貼牆、進入 TOWER |

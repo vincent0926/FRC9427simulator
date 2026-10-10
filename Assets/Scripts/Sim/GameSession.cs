@@ -12,7 +12,9 @@ namespace FrcSim
         public static HalSim Hal;
         public static int Station = 1;          // 玩家的起始站位(AutoPlan.Names:0..2 藍 1~3、3..5 紅 1~3)
         public static AutoDrive Auto, Auto2;
-        public static NtChooser Chooser;    // 內建自動路線(真實程式模式的玩家機器人沒有,自動程式由 Java 程式跑)
+        public static NtChooser Chooser;
+        public static bool AutoOnly;            // 自動模式:只跑 AUTO(20 秒 + 3 秒計分寬限)就停,顯示 AUTO 成績
+        static string lastProjectOverride;    // 內建自動路線(真實程式模式的玩家機器人沒有,自動程式由 Java 程式跑)
 
         static readonly Color BlueBody = new Color(0.15f, 0.35f, 0.9f), RedBody = new Color(0.9f, 0.2f, 0.2f);
 
@@ -29,7 +31,7 @@ namespace FrcSim
         static bool LegacyTestRun()
         {
             var a = System.Environment.GetCommandLineArgs();
-            foreach (var f in new[] { "-padtest", "-fieldtest", "-walltest", "-balltest", "-soaktest", "-settletest", "-selftest", "-realtest", "-leotest" })
+            foreach (var f in new[] { "-padtest", "-fieldtest", "-walltest", "-balltest", "-soaktest", "-settletest", "-selftest", "-realtest", "-leotest", "-shottest" })
                 if (System.Array.IndexOf(a, f) >= 0) return true;
             return false;
         }
@@ -57,6 +59,7 @@ namespace FrcSim
         {
             if (Active) return;
             Active = true;
+            lastProjectOverride = projectOverride;
             StartTime = Time.time;
             SimConstants.MaxSpeed = SettingsStore.MaxSpeedChoice;   // 開始前選的最高車速
             SimConstants.MaxAccel = SettingsStore.AccelChoice;      // 開始前選的加速度(慣性)
@@ -182,6 +185,14 @@ namespace FrcSim
                 var st = new GameObject("SelfTest").AddComponent<SelfTest>();
                 st.Drive = Drive; st.Mech = Mech;
             }
+        }
+
+        // 自動模式結束後按 Enter:同樣設定再跑一次
+        public static void Restart(CameraRig rig)
+        {
+            string p = lastProjectOverride;
+            End(rig);
+            Begin(rig, false, p);
         }
 
         static bool IsTankProfile(string dir)

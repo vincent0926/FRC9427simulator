@@ -217,10 +217,63 @@ namespace FrcSim
             var s = Build(() => Loc.T("mode.title"), null, new[]
             {
                 new Item(() => Loc.T("mode.free"),  ShowRobotSetup),
-                // 「比賽模式/自動階段練習」還沒做,先不顯示避免新手點不動(比賽計時在機器人設定頁開關)
+                new Item(() => Loc.T("mode.auto"),  ShowAutoSetup),
                 new Item(() => Loc.T("menu.back"),  ShowMain),
             }, ShowMain);
             Show(s, false);
+        }
+
+        // 自動模式:只跑 AUTO 20 秒,跑的是使用者自己的機器人程式(開賽前選自動程式),結束顯示 AUTO 成績,Enter 再跑一次
+        void ShowAutoSetup()
+        {
+            var s = Build(() => Loc.T("auto.title"), () => Loc.T("auto.sub"), new[]
+            {
+                new Item(() =>
+                {
+                    string c = PlayerPrefs.GetString("robotProject", "");
+                    return Loc.T("setup.code") + ":  " + (c == "" ? Loc.T("auto.pick") : System.IO.Path.GetFileName(c.TrimEnd('\\', '/')));
+                }, PickProject),
+                new Item(() => Loc.T("setup.station") + ":  " + AutoPlan.Labels[AutoPlan.Clamp(PlayerPrefs.GetInt("station", 1))], () =>
+                {
+                    PlayerPrefs.SetInt("station", (AutoPlan.Clamp(PlayerPrefs.GetInt("station", 1)) + 1) % AutoPlan.Count); PlayerPrefs.Save();
+                }),
+                new Item(() => Loc.T("set.model") + ":  " + (RobotModels.Selected == "" ? Loc.T("model.builtin") : RobotModels.Selected), () =>
+                {
+                    var list = new List<string> { "" };
+                    list.AddRange(RobotModels.List());
+                    int i = list.IndexOf(RobotModels.Selected);
+                    RobotModels.Selected = list[(i + 1) % list.Count];
+                }),
+                new Item(() => Loc.T("setup.yaw") + ":  " + RobotModels.YawDeg.ToString("0") + "°", () =>
+                {
+                    RobotModels.YawDeg = (RobotModels.YawDeg + 90f) % 360f;
+                }),
+                new Item(() => Loc.T("setup.second") + ":  " + Loc.T(PlayerPrefs.GetInt("secondRobot", 1) == 1 ? "on" : "off"), () =>
+                {
+                    PlayerPrefs.SetInt("secondRobot", PlayerPrefs.GetInt("secondRobot", 1) == 1 ? 0 : 1); PlayerPrefs.Save();
+                }),
+                new Item(() => Loc.T("auto.start"), StartAutoMode),
+                new Item(() => Loc.T("menu.back"), ShowModes),
+            }, ShowModes);
+            Show(s, false);
+        }
+
+        void PickProject()
+        {
+            string p = NativeDialogs.PickFolder(Loc.T("setup.code"));
+            if (string.IsNullOrEmpty(p)) return;
+            PlayerPrefs.SetString("robotProject", FindGradleRoot(p));
+            PlayerPrefs.Save();
+        }
+
+        void StartAutoMode()
+        {
+            string proj = PlayerPrefs.GetString("robotProject", "");
+            if (proj == "" || !System.IO.File.Exists(System.IO.Path.Combine(proj, "gradlew.bat"))) { PickProject(); proj = PlayerPrefs.GetString("robotProject", ""); }
+            if (proj == "" || !System.IO.File.Exists(System.IO.Path.Combine(proj, "gradlew.bat"))) return;   // 沒選到專案:留在這頁
+            Hide();
+            GameSession.AutoOnly = true;
+            GameSession.Begin(Rig, false, proj);   // 直接指定專案:不受「坦克模式只跑坦克專案」限制
         }
 
         // 進遊戲前:選機器人模型、匯入 .glb、選機器人程式專案
@@ -412,6 +465,7 @@ namespace FrcSim
         void StartGame()
         {
             Hide();
+            GameSession.AutoOnly = false;
             GameSession.Begin(Rig);
         }
 

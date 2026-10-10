@@ -41,7 +41,17 @@ namespace FrcSim
         public static float YawDeg
         {
             // kepler.glb 的 intake 在模型 +z 側,車頭(+x)要轉 90° 才對;使用者沒調過時預設用這個
-            get => PlayerPrefs.GetFloat("modelYaw", Selected == "kepler.glb" ? 90f : 0f);
+            get
+            {
+                // 一次性修正:舊版把 Kepler 的方向存成 0°,畫面上的 intake 會在車子側邊,和真正吸球的那面(車頭)不一樣
+                if (Selected == "kepler.glb" && PlayerPrefs.GetInt("modelYawFixV2", 0) == 0)
+                {
+                    PlayerPrefs.SetInt("modelYawFixV2", 1);
+                    if (PlayerPrefs.HasKey("modelYaw") && Mathf.Abs(PlayerPrefs.GetFloat("modelYaw") - 90f) > 1f) PlayerPrefs.SetFloat("modelYaw", 90f);
+                    PlayerPrefs.Save();
+                }
+                return PlayerPrefs.GetFloat("modelYaw", Selected == "kepler.glb" ? 90f : 0f);
+            }
             set { PlayerPrefs.SetFloat("modelYaw", value); PlayerPrefs.Save(); }
         }
 
@@ -57,7 +67,7 @@ namespace FrcSim
 
         static void HideBuiltin(Transform robot)
         {
-            foreach (var n in new[] { "Body", "IntakeArm", "Turret" })
+            foreach (var n in new[] { "Body", "Turret" })   // IntakeArm(橘色)保留:看得出哪一面是會吸球的 intake
             {
                 var t = robot.Find(n);
                 if (t != null) t.gameObject.SetActive(false);

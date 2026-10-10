@@ -64,6 +64,27 @@ namespace FrcSim
             sb.AppendLine($"during AUTO: max |motorVoltage[3]|={maxV:0.00} V, max speed={maxVl:0.00} m/s, mechsim at max: {sample}, enabled={hal.Enabled} auto={hal.Autonomous}");
             Check(ScoreManager.MatchTime > 3f && ScoreManager.Phase == "AUTO", $"match running in AUTO (t={ScoreManager.MatchTime:0.0})");
 
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-automode") >= 0)
+            {
+                // 自動模式:AUTO 20 秒 + 3 秒寬限後結束、機器人 Disabled;再跑一次(Restart)程式要能重新連上
+                float te = Time.realtimeSinceStartup;
+                while (!ScoreManager.Ended && Time.realtimeSinceStartup - te < 40f) yield return null;
+                Check(ScoreManager.Ended && ScoreManager.Phase == "AUTO DONE" && !hal.Enabled, $"auto mode ends after AUTO (phase={ScoreManager.Phase}, t={ScoreManager.MatchTime:0.0}, enabled={hal.Enabled})");
+                nt.Strings.TryGetValue("SimTest/AutoRan", out string ran1);
+                Check(generic || ran1 == choice, $"robot code ran '{ran1}'");
+                var rig = FindFirstObjectByType<CameraRig>();
+                GameSession.Restart(rig);
+                hal = GameSession.Hal; nt = GameSession.Chooser;
+                float tr = Time.realtimeSinceStartup;
+                while (hal != null && !hal.Connected && hal.Starting && Time.realtimeSinceStartup - tr < 300f) yield return null;
+                sb.AppendLine($"restart: {(hal == null ? "no hal" : hal.Status)} after {Time.realtimeSinceStartup - tr:0} s");
+                Check(hal != null && hal.Connected, "run again: robot code starts again (no log-file sharing violation)");
+                float tc = Time.realtimeSinceStartup;
+                while (PreMatch.I != null && PreMatch.I.Active && !PreMatch.I.HasChooser && Time.realtimeSinceStartup - tc < 30f) yield return null;
+                Check(PreMatch.I != null && PreMatch.I.HasChooser, "run again: auto chooser found again");
+                Finish(sb, ok);
+                yield break;
+            }
             if (generic)
             {
                 yield return new WaitForSecondsRealtime(10f);   // 多跑一點時間收集效能數據

@@ -117,6 +117,7 @@ namespace FrcSim
                 if (rti >= 0 && rti + 1 < ra.Length)
                 {
                     AutoTest.SaveAndOverridePrefs();   // 測試結束會還原
+                    GameSession.AutoOnly = System.Array.IndexOf(ra, "-automode") >= 0;   // 測「自動模式」
                     GameSession.Begin(rig, false, ra[rti + 1]);
                     new GameObject("RealAutoTest").AddComponent<RealAutoTest>();
                     return;
@@ -129,6 +130,13 @@ namespace FrcSim
                 var aa = System.Environment.GetCommandLineArgs(); int fi = System.Array.IndexOf(aa, "-fakecode");
                 GameSession.Begin(rig, false, fi >= 0 && fi + 1 < aa.Length ? aa[fi + 1] : null);   // -fakecode <資料夾>:模擬「真實程式啟動失敗」
                 new GameObject("AutoTest").AddComponent<AutoTest>();
+                return;
+            }
+
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-shottest") >= 0)
+            {
+                GameSession.Begin(rig);
+                new GameObject("ShotTest").AddComponent<ShotTest>();
                 return;
             }
 

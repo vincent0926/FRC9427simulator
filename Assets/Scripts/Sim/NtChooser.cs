@@ -194,6 +194,7 @@ namespace FrcSim
             return true;
         }
         public bool SawPathPlanner => ppTarget != null;
+        public void ClearPathTarget() { ppTarget = null; }
         public long PathTargetAgeMs => NowMs - System.Threading.Interlocked.Read(ref ppStamp);
 
         void OnValue(string topic, object v)

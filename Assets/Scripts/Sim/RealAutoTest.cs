@@ -132,6 +132,25 @@ namespace FrcSim
             if (generic)
             {
                 yield return new WaitForSecondsRealtime(10f);   // 多跑一點時間收集效能數據
+                if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-teleop") >= 0)
+                {
+                    // TELEOP:跳過 AUTO,推左搖桿往前,車子要動(v0.2.8 會卡在 AUTO 最後一個 PathPlanner 目標點)
+                    ScoreManager.MatchTime = 30f;
+                    yield return new WaitForSecondsRealtime(2f);
+                    Vector2 tp0 = GameSession.Drive.Pose2d;
+                    Pad.SetFake(true, ly: 1f, ry: 1f);
+                    yield return new WaitForSecondsRealtime(2.5f);
+                    Pad.SetFake(true);
+                    float tm = (GameSession.Drive.Pose2d - tp0).magnitude;
+                    var ms2 = GameSession.Drive.GetComponent<MechSim>();
+                    sb.AppendLine($"teleop: phase={ScoreManager.Phase} autonomous={hal.Autonomous} moved {tm:0.00} m with stick forward; follow={(ms2 != null ? ms2.FollowSource + " " + ms2.FollowingCode : "-")}");
+                    Check(tm > 0.5f, "TELEOP: stick drives the robot after AUTO");
+                    yield return new WaitForSecondsRealtime(1.5f);
+                    Vector2 tp1 = GameSession.Drive.Pose2d;
+                    yield return new WaitForSecondsRealtime(2f);
+                    Check((GameSession.Drive.Pose2d - tp1).magnitude < 0.15f, $"TELEOP: released stick, robot stays (moved {(GameSession.Drive.Pose2d - tp1).magnitude:0.00} m)");
+                    Pad.SetFake(false);
+                }
                 sb.AppendLine($"robot moved {(d.Pose2d - p0).magnitude:0.00} m; mechsim: {(d.GetComponent<MechSim>() != null ? d.GetComponent<MechSim>().Info : "none")}");
                 Finish(sb, ok);
                 yield break;

@@ -186,7 +186,10 @@ namespace FrcSim
             input.Mech = Mech;
 
             // 內建行為模式:AUTO 階段跑內建自動路線(真實程式模式由機器人程式自己跑自動)
-            if (Hal == null && !selfTest && !LegacyTestRun())
+            // 自由練習:玩家的車一開始就給玩家開(不跑內建自動,否則 AUTO 20 秒車子自己動、手把無效,看起來像亂動/不會動)。
+            // 只有 -autotest 測試時玩家的車才跑內建自動路線;第二台機器人照樣跑它的自動。
+            bool builtinAutoForPlayer = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-autotest") >= 0;
+            if (Hal == null && !selfTest && !LegacyTestRun() && builtinAutoForPlayer)
             {
                 Auto = robot.AddComponent<AutoDrive>();
                 Auto.Drive = Drive; Auto.Mech = Mech; Auto.Station = Station; Auto.Routine = ChosenRoutine();

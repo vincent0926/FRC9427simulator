@@ -305,10 +305,13 @@ namespace FrcSim
             var nt = GameSession.Chooser;
             // 目標:PathPlanner 正在跟的路線點(/PathPlanner/targetPose,就是你設計的路線);沒有 PathPlanner 才用程式自己估的位姿
             double tx = 0, ty = 0, tdeg = 0;
-            bool havePath = nt != null && nt.TryPathTarget(out tx, out ty, out tdeg);
+            // PathPlanner 目標只在 AUTO 用;TELEOP 清掉(否則車子會一直停在 AUTO 最後一個目標點,手把開不動)
+            bool autoNow = Hal.Autonomous;
+            if (!autoNow && nt != null) nt.ClearPathTarget();
+            bool havePath = autoNow && nt != null && nt.TryPathTarget(out tx, out ty, out tdeg);
             if (!Hal.Enabled) enabledAt = -1f; else if (enabledAt < 0f) enabledAt = Time.time;
             // 沒有 PathPlanner 目標時才用程式估的位姿,而且要啟用 0.5 秒後(開賽瞬間程式的位姿常常還沒重置,會把車拖走)
-            bool haveTarget = havePath || (nt != null && enabledAt >= 0f && Time.time - enabledAt > 0.5f && !nt.SawPathPlanner && nt.TryCodePose(out tx, out ty, out tdeg));
+            bool haveTarget = havePath || (nt != null && enabledAt >= 0f && Time.time - enabledAt > 0.5f && (!autoNow || !nt.SawPathPlanner) && nt.TryCodePose(out tx, out ty, out tdeg));
             if (followCodePose && Hal.Enabled && haveTarget)
             {
                 const float tau = 0.1f;

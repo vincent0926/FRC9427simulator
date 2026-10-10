@@ -133,6 +133,14 @@ namespace FrcSim
                 return;
             }
 
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-freetest") >= 0)
+            {
+                AutoTest.SaveAndOverridePrefs();   // 比賽計時開、內建行為、坦克;測完還原
+                GameSession.Begin(rig);
+                new GameObject("FreeTest").AddComponent<FreeTest>();
+                return;
+            }
+
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-shottest") >= 0)
             {
                 GameSession.Begin(rig);

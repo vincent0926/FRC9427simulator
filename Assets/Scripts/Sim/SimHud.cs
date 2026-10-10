@@ -158,7 +158,7 @@ namespace FrcSim
                     ? L("手把:左/右搖桿 = 左/右側輪   A 放手臂   B 滾輪   RT 發射   RB 送球   十字鍵左右 砲塔   Start 暫停",
                         "Pad: L/R stick = left/right side   A arm   B roller   RT shoot   RB feed   D-pad L/R turret   Start pause")
                     : L("WASD 移動   Q/E 旋轉   Shift 慢速   I 吸球   空白/滑鼠 射擊   F 場地/車體座標", "WASD move   Q/E rotate   Shift slow   I intake   Space/Mouse shoot   F field/robot");
-                string t2 = L("H 人類球員放球   C 視角   R 重置   Esc 暫停   2P(紅):方向鍵移動  ,. 旋轉  / 吸球  右Ctrl 射擊", "H human-player chute   C camera   R reset   Esc pause   P2 (red): arrows move  ,. rotate  / intake  RCtrl shoot");
+                string t2 = L("H 人類球員放球   C 視角   R 重置   Esc 暫停   2P:方向鍵移動  ,. 旋轉  / 吸球  右Ctrl 射擊  \\ 放球", "H human-player chute   C camera   R reset   Esc pause   P2: arrows move  ,. rotate  / intake  RCtrl shoot  \\ chute");
                 float hw = Mathf.Min(W - 20, 1100);
                 Panel(new Rect(cx - hw / 2f, H - 62, hw, 52), 0.6f);
                 var hs = Style(14, dim);

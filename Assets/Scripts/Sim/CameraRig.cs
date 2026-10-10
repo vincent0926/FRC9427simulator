@@ -33,9 +33,10 @@ namespace FrcSim
             }
 
             Vector3 pos; Quaternion rot;
+            bool red = AutoPlan.IsRed(GameSession.Station);   // 紅方玩家:俯瞰/正上方視角轉 180°,和藍方玩家看到的一樣
             if (Mode == 0)
             {
-                pos = new Vector3(L / 2f, 14f, W / 2f - 3.5f);
+                pos = new Vector3(L / 2f, 14f, red ? W / 2f + 3.5f : W / 2f - 3.5f);
                 rot = Quaternion.LookRotation(new Vector3(L / 2f, 0f, W / 2f) - pos, Vector3.up);
             }
             else if (Mode == 1)
@@ -77,7 +78,7 @@ namespace FrcSim
                 pos = new Vector3(Mathf.Clamp(Target.position.x, Mathf.Min(5f, L / 2f), Mathf.Max(L - 5f, L / 2f)),
                                   9f,
                                   Mathf.Clamp(Target.position.z, Mathf.Min(3.2f, W / 2f), Mathf.Max(W - 3.2f, W / 2f)));
-                rot = Quaternion.LookRotation(Vector3.down, Vector3.forward);
+                rot = Quaternion.LookRotation(Vector3.down, red ? Vector3.back : Vector3.forward);
             }
             transform.position = Vector3.SmoothDamp(transform.position, pos, ref velPos, 0.12f, Mathf.Infinity, Time.unscaledDeltaTime);
             transform.rotation = Quaternion.Slerp(transform.rotation, rot, 8f * Time.unscaledDeltaTime);

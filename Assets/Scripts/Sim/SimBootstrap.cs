@@ -114,7 +114,7 @@ namespace FrcSim
 
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-autotest") >= 0)
             {
-                PlayerPrefs.SetInt("matchClock", 1); PlayerPrefs.SetInt("secondRobot", 1); PlayerPrefs.SetInt("useRealCode", 0);
+                AutoTest.SaveAndOverridePrefs();   // 測試結束會還原,不改使用者的設定
                 GameSession.Begin(rig);
                 new GameObject("AutoTest").AddComponent<AutoTest>();
                 return;

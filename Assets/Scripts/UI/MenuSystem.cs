@@ -287,6 +287,10 @@ namespace FrcSim
                 {
                     PlayerPrefs.SetInt("station", (AutoPlan.Clamp(PlayerPrefs.GetInt("station", 1)) + 1) % AutoPlan.Count); PlayerPrefs.Save();
                 }),
+                new Item(() => Loc.T("setup.routine") + ":  " + (Loc.Lang == "zh" ? AutoPlan.RoutineLabelsZh : AutoPlan.RoutineLabelsEn)[(int)AutoPlan.ClampRoutine(PlayerPrefs.GetInt("autoRoutine", 0))], () =>
+                {
+                    PlayerPrefs.SetInt("autoRoutine", ((int)AutoPlan.ClampRoutine(PlayerPrefs.GetInt("autoRoutine", 0)) + 1) % AutoPlan.RoutineCount); PlayerPrefs.Save();
+                }),
                 new Item(() => Loc.T("setup.second") + ":  " + Loc.T(PlayerPrefs.GetInt("secondRobot", 1) == 1 ? "on" : "off"), () =>
                 {
                     PlayerPrefs.SetInt("secondRobot", PlayerPrefs.GetInt("secondRobot", 1) == 1 ? 0 : 1); PlayerPrefs.Save();

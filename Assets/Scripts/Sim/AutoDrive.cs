@@ -9,6 +9,7 @@ namespace FrcSim
         public SwerveDrive Drive;
         public RobotMechanisms Mech;
         public int Station = 1;
+        public AutoRoutine Routine = AutoRoutine.ByStation;
         public AutoRunner Runner;
         public bool Running { get; private set; }
         public string StepName => Runner == null ? "" : (Runner.Done ? "done" : Runner.Current.Name);
@@ -16,7 +17,7 @@ namespace FrcSim
 
         public static bool AutoPhase => ScoreManager.ClockOn && ScoreManager.Phase == "AUTO" && !ScoreManager.Ended && !ScoreManager.WaitingForCode;
 
-        void Start() { Runner = new AutoRunner(Station); }
+        void Start() { Runner = new AutoRunner(Station, Routine); }
 
         void Update()
         {

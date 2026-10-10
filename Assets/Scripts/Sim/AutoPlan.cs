@@ -7,8 +7,10 @@ namespace FrcSim
     //  · 起始位置:Blue1/2/3、Red1/2/3(駕駛站位置)。藍方 1 號在場地 y 大的一側(藍方駕駛看出去的左手邊),
     //    紅方是藍方繞場地中心旋轉 180°(場地旋轉對稱),所以 Red n 與 Blue n 互為鏡像。
     //  · 真實程式模式:站位送進 DriverStation(機器人程式用 DriverStation.getAlliance()/getLocation() 讀到),自動程式由機器人程式自己跑。
-    //  · 內建行為模式 / 第二台機器人:跑這裡的內建路線(倒退到射擊點 → 射完預載 →(1 號)去 DEPOT 吃球 → 回來再射)。
+    //  · 內建行為模式 / 第二台機器人:跑這裡的內建路線,路線可以和站位分開選(AutoRoutine):
+    //      ByStation 依站位(1 號 = DEPOT,其他 = 只射預載)、PreloadOnly、Depot、Neutral(穿過 TRENCH 去中立區吃球,在中立區這側射)、None(不動)。
     public enum AutoStepKind { Drive, Shoot, Collect }
+    public enum AutoRoutine { ByStation, PreloadOnly, Depot, Neutral, None }
 
     public class AutoStep
     {
@@ -35,6 +37,14 @@ namespace FrcSim
         public const float DepotY = 5.965f;
         public static readonly string[] Names = { "blue1", "blue2", "blue3", "red1", "red2", "red3" };
         public static readonly string[] Labels = { "Blue 1", "Blue 2", "Blue 3", "Red 1", "Red 2", "Red 3" };
+        public const int RoutineCount = 5;
+        public static readonly string[] RoutineNames = { "bystation", "preload", "depot", "neutral", "none" };
+        public static readonly string[] RoutineLabelsZh = { "依站位", "只射預載", "預載 + DEPOT", "預載 + 中立區(TRENCH)", "不動" };
+        public static readonly string[] RoutineLabelsEn = { "By station", "Preload only", "Preload + DEPOT", "Preload + neutral (TRENCH)", "Do nothing" };
+        public static int ParseRoutine(string name) => Array.IndexOf(RoutineNames, (name ?? "").Trim().ToLowerInvariant());
+        public static AutoRoutine ClampRoutine(int r) => r < 0 || r >= RoutineCount ? AutoRoutine.ByStation : (AutoRoutine)r;
+        // 中立區路線:TRENCH 開口在場邊 0~1.279 m(車寬 0.8 → 車心 y 0.64),HUB 中心 ±0.6 m 的 x 範圍內;中立區的球約 x 7.4~9.1、y 3.1~5.0
+        public const float TrenchY = 0.64f, NeutralShootX = 6.60f, NeutralShootY = 2.40f;
         static readonly float[] BlueStartY = { 6.60f, FieldWidth / 2f, FieldWidth - 6.60f };
         static readonly float[] BlueShootY = { 5.60f, FieldWidth / 2f, FieldWidth - 5.60f };
 
@@ -71,21 +81,43 @@ namespace FrcSim
             if (IsRed(station)) Mirror(ref x, ref y, ref headingDeg);
         }
 
-        public static List<AutoStep> Routine(int station)
+        public static AutoRoutine Resolve(int station, AutoRoutine routine)
+        {
+            if (routine != AutoRoutine.ByStation) return routine;
+            return Clamp(station) % 3 == 0 ? AutoRoutine.Depot : AutoRoutine.PreloadOnly;
+        }
+
+        public static List<AutoStep> Routine(int station) => Routine(station, AutoRoutine.ByStation);
+
+        public static List<AutoStep> Routine(int station, AutoRoutine routine)
         {
             station = Clamp(station);
             int n = station % 3;
             float sy = BlueShootY[n];
-            var s = new List<AutoStep>
+            routine = Resolve(station, routine);
+            var s = new List<AutoStep>();
+            if (routine == AutoRoutine.None) return s;
+            s.Add(new AutoStep(AutoStepKind.Drive, ShootX, sy, 0f, 4f, "to-shoot"));
+            s.Add(new AutoStep(AutoStepKind.Shoot, ShootX, sy, 0f, 4f, "shoot-preload"));
+            if (routine == AutoRoutine.Neutral)
             {
-                new AutoStep(AutoStepKind.Drive, ShootX, sy, 0f, 4f, "to-shoot"),
-                new AutoStep(AutoStepKind.Shoot, ShootX, sy, 0f, 4f, "shoot-preload"),
-            };
-            if (n == 0)
+                // 走離站位最近的 TRENCH(1 號 = y 大那側,2、3 號 = y 小那側);藍方 1 號的路線是 3 號對 y 鏡像
+                bool high = n == 0;
+                float Y(float y) => high ? FieldWidth - y : y;
+                s.Add(new AutoStep(AutoStepKind.Drive, 3.20f, Y(TrenchY), 0f, 4f, "to-trench"));
+                s.Add(new AutoStep(AutoStepKind.Drive, 6.00f, Y(TrenchY), 0f, 4f, "through-trench"));
+                s.Add(new AutoStep(AutoStepKind.Drive, NeutralShootX, Y(NeutralShootY), 0f, 3f, "to-neutral"));
+                s.Add(new AutoStep(AutoStepKind.Collect, 7.70f, Y(3.50f), 0f, 3f, "collect-neutral"));
+                s.Add(new AutoStep(AutoStepKind.Drive, NeutralShootX, Y(NeutralShootY), 0f, 3f, "back-to-shoot"));
+                s.Add(new AutoStep(AutoStepKind.Shoot, NeutralShootX, Y(NeutralShootY), 0f, 4f, "shoot-neutral"));
+            }
+            if (routine == AutoRoutine.Depot)
             {
                 // 1 號靠 DEPOT:車頭朝聯盟牆,放下 intake 慢慢開進 DEPOT 吃球,再回射擊點
+                if (n != 0) s.Add(new AutoStep(AutoStepKind.Drive, ShootX, DepotY, 180f, 4f, "to-depot-lane"));   // 2、3 號先沿 x=2.1 走到 DEPOT 那排,避開 TOWER 立柱(x≈1.1)
                 s.Add(new AutoStep(AutoStepKind.Drive, 1.40f, DepotY, 180f, 4f, "to-depot"));
                 s.Add(new AutoStep(AutoStepKind.Collect, 0.62f, DepotY, 180f, 3f, "collect-depot"));
+                if (n != 0) s.Add(new AutoStep(AutoStepKind.Drive, ShootX, DepotY, 0f, 4f, "return-lane"));
                 s.Add(new AutoStep(AutoStepKind.Drive, ShootX, sy, 0f, 4f, "return"));
                 s.Add(new AutoStep(AutoStepKind.Shoot, ShootX, sy, 0f, 4f, "shoot-depot"));
             }
@@ -106,6 +138,7 @@ namespace FrcSim
         const float Kp = 2.5f, KpTheta = 4f, PosTol = 0.10f, AngTol = 0.08f;
 
         public AutoRunner(int station) { Steps = AutoPlan.Routine(station); }
+        public AutoRunner(int station, AutoRoutine routine) { Steps = AutoPlan.Routine(station, routine); }
         public AutoStep Current => Done ? null : Steps[Index];
 
         public AutoCmd Update(float x, float y, float headingRad, int held, float dt)

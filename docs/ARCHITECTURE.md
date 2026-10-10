@@ -31,12 +31,13 @@ Unity (HalSim.cs / MechSim.cs / NtSim.cs)
 - 起點:保險桿在起始線(聯盟區邊界)後 5 cm,車頭朝場內。第二台機器人放在對面聯盟的同號站位。
 - **真實程式模式**:站位送進 HALSim 的 DriverStation(`>station`),機器人程式用 `DriverStation.getAlliance()` / `getLocation()` 讀得到;比賽時鐘 AUTO 20 秒期間 DS 是 autonomous,跑的是機器人程式自己的自動程式。程式啟動中(還沒連上)時鐘暫停,連上後才從 AUTO 開始。
 - **內建行為模式 / 第二台機器人**:跑 `AutoPlan.cs` 的內建路線(`AutoDrive.cs` 執行):倒退到射擊點 → 射完 8 顆預載;1 號站位再去 DEPOT 吃球、回來再射。AUTO 期間手把無效,按 N 跳過。
+- 內建路線可在設定畫面「內建自動路線」另外選(或 `-routine bystation|preload|depot|neutral|none`):依站位(1 號 DEPOT、其他只射預載)/ 只射預載 / 預載 + DEPOT / 預載 + 中立區(穿過 TRENCH 吃球、在中立區這側射)/ 不動。
 - `AutoPlan.cs` 不依賴 UnityEngine,單元測試:`dotnet run --project Tools/tests/AutoPlanTests`(需要 .NET 8 SDK)。
 
 ## 自動測試(皆加 `-batchmode -nographics`)
 | 參數 | 內容 |
 |---|---|
-| `-autotest [-station blue1]` | 內建自動階段:起始站位、兩台機器人 AUTO 射完預載並得分、AUTO 結束後交還手動(結果 autotest.txt) |
+| `-autotest [-station blue1] [-routine neutral]` | 內建自動階段:起始站位、兩台機器人 AUTO 射完預載並得分、AUTO 結束後交還手動(結果 autotest.txt) |
 | `-autotest -fakecode <資料夾>` | 真實程式啟動失敗(資料夾內放一個馬上結束的 gradlew.bat):比賽時鐘不會卡在 AUTO、第二台機器人照常跑自動 |
 | `-padtest -norealcode` | 假手把輸入走一遍:坦克開車、轉向、Intake、發射、車身傾斜 |
 | `-fieldtest` | 隧道、立柱、BUMP 通過與抬升 |

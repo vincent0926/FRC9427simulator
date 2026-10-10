@@ -53,7 +53,7 @@ namespace FrcSim
             var a1 = GameSession.Auto; var a2 = GameSession.Auto2;
             Check(a1 != null && a2 != null, "both robots have AutoDrive");
             AutoPlan.StartPose(GameSession.Station, out float sx, out float sy, out _);
-            sb.AppendLine($"station={AutoPlan.Names[GameSession.Station]} start=({sx:0.00},{sy:0.00}) robot=({d.Pose2d.x:0.00},{d.Pose2d.y:0.00})");
+            sb.AppendLine($"routine={a1?.Routine} station={AutoPlan.Names[GameSession.Station]} start=({sx:0.00},{sy:0.00}) robot=({d.Pose2d.x:0.00},{d.Pose2d.y:0.00})");
             Check(Vector2.Distance(d.Pose2d, new Vector2(sx, sy)) < 0.3f, "player robot spawned at its station");
             Check(AutoDrive.AutoPhase, "match starts in AUTO");
 
@@ -63,9 +63,19 @@ namespace FrcSim
             sb.AppendLine($"after AUTO: blue={ScoreManager.BlueScore} red={ScoreManager.RedScore} shots p1={m.ShotsFired} held={m.Held} step={a1?.StepName}");
             var m2 = a2 != null ? a2.GetComponent<RobotMechanisms>() : null;
             if (m2 != null) sb.AppendLine($"robot2 shots={m2.ShotsFired} held={m2.Held} step={a2.StepName}");
-            Check(m.ShotsFired >= 8, "player robot fired its 8 preloaded FUEL in AUTO");
-            Check(m2 != null && m2.ShotsFired >= 8, "robot2 fired its 8 preloaded FUEL in AUTO");
-            Check(ScoreManager.BlueScore >= 4 && ScoreManager.RedScore >= 4, "both alliances scored in AUTO");
+            if (a1.Routine == AutoRoutine.None)
+            {
+                Check(m.ShotsFired == 0 && ScoreManager.BlueScore + ScoreManager.RedScore == 0, "'do nothing' routine fires nothing");
+                Check(Vector2.Distance(d.Pose2d, new Vector2(sx, sy)) < 0.3f, "'do nothing' routine stays at the start");
+            }
+            else
+            {
+                Check(m.ShotsFired >= 8, "player robot fired its 8 preloaded FUEL in AUTO");
+                Check(m2 != null && m2.ShotsFired >= 8, "robot2 fired its 8 preloaded FUEL in AUTO");
+                Check(ScoreManager.BlueScore >= 4 && ScoreManager.RedScore >= 4, "both alliances scored in AUTO");
+                var eff = AutoPlan.Resolve(GameSession.Station, a1.Routine);
+                if (eff == AutoRoutine.Depot || eff == AutoRoutine.Neutral) Check(m.ShotsFired > 8 && a1.StepName == "done", $"{eff} routine collected more FUEL and finished ({m.ShotsFired} shots)");
+            }
             Check(!a1.Running && !a2.Running, "auto stopped after AUTO phase");
 
             File.WriteAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), "autotest.txt"), sb.ToString() + (ok ? "PASS" : "FAIL") + "\n");

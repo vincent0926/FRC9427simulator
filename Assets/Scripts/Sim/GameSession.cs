@@ -33,6 +33,15 @@ namespace FrcSim
             return false;
         }
 
+        // 內建自動路線:命令列 -routine neutral 優先,否則用設定畫面選的(PlayerPrefs "autoRoutine",預設依站位)
+        public static AutoRoutine ChosenRoutine()
+        {
+            var a = System.Environment.GetCommandLineArgs();
+            int i = System.Array.IndexOf(a, "-routine");
+            if (i >= 0 && i + 1 < a.Length && AutoPlan.ParseRoutine(a[i + 1]) >= 0) return (AutoRoutine)AutoPlan.ParseRoutine(a[i + 1]);
+            return AutoPlan.ClampRoutine(PlayerPrefs.GetInt("autoRoutine", 0));
+        }
+
         static Vector2 Hub(bool red) => red ? new Vector2(SimConstants.FieldLength - 4.42586f, SimConstants.FieldWidth / 2f) : RobotMechanisms.BlueHub;
 
         static void PlaceAtStation(SwerveDrive d, int station)
@@ -88,7 +97,7 @@ namespace FrcSim
                 m2.TargetHub = Hub(red2);
                 var in2 = robot2.AddComponent<Robot2Input>(); in2.Drive = d2; in2.Mech = m2;
                 if (!LegacyTestRun()) Auto2 = robot2.AddComponent<AutoDrive>();
-                if (Auto2 != null) { Auto2.Drive = d2; Auto2.Mech = m2; Auto2.Station = st2; }
+                if (Auto2 != null) { Auto2.Drive = d2; Auto2.Mech = m2; Auto2.Station = st2; Auto2.Routine = ChosenRoutine(); }
             }
 
             // 真實機器人程式(設定畫面選的專案;沒選就用內建行為)
@@ -153,7 +162,7 @@ namespace FrcSim
             if (Hal == null && !selfTest && !LegacyTestRun())
             {
                 Auto = robot.AddComponent<AutoDrive>();
-                Auto.Drive = Drive; Auto.Mech = Mech; Auto.Station = Station;
+                Auto.Drive = Drive; Auto.Mech = Mech; Auto.Station = Station; Auto.Routine = ChosenRoutine();
             }
 
             if (selfTest)

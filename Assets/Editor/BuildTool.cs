@@ -120,25 +120,26 @@ public static class BuildTool
                 if (ids == null) continue;
                 var inv = System.Globalization.CultureInfo.InvariantCulture;
                 string F(double d) => double.IsPositiveInfinity(d) ? "Infinity" : double.IsNegativeInfinity(d) ? "-Infinity" : d.ToString("R", inv);
-                var sb = new System.Text.StringBuilder("# id coderId ratio inertia friction invert min max\n");
+                var sb = new System.Text.StringBuilder("# id coderId ratio inertia friction invert min max coderOffset\n");
                 foreach (var idTok in ids)
                 {
                     string name = (string)idTok;
                     var mm = System.Text.RegularExpressions.Regex.Match(name, @"\[(\d+)\]$");
                     if (!mm.Success) continue;
                     var ld = j["loads"]?["[" + mm.Groups[1].Value + "]"] as Newtonsoft.Json.Linq.JObject;
-                    int coder = -1; double ratio = 26.09090909090909;
+                    int coder = -1; double ratio = 26.09090909090909, coderOff = 0;
                     foreach (var l in (Newtonsoft.Json.Linq.JArray)j["links"] ?? new Newtonsoft.Json.Linq.JArray())
                         if ((string)l["motor"] == name)
                         {
                             var cm = System.Text.RegularExpressions.Regex.Match((string)l["sensor"], @"\[(\d+)\]$");
                             if (cm.Success) coder = int.Parse(cm.Groups[1].Value);
                             ratio = (double?)l["ratio"] ?? ratio;
+                            coderOff = (double?)l["offset"] ?? 0;   // CANcoder 原始值偏移 = -MagnetOffset(圈)
                         }
                     double J = (double?)ld?["inertia"] ?? 0.002, fr = (double?)ld?["friction"] ?? 0.01;
                     bool iv = (bool?)ld?["invert"] ?? false;
                     double mn = (double?)ld?["minRot"] ?? double.NegativeInfinity, mx = (double?)ld?["maxRot"] ?? double.PositiveInfinity;
-                    sb.Append(mm.Groups[1].Value).Append(' ').Append(coder).Append(' ').Append(F(ratio)).Append(' ').Append(F(J)).Append(' ').Append(F(fr)).Append(' ').Append(iv ? 1 : 0).Append(' ').Append(F(mn)).Append(' ').Append(F(mx)).Append('\n');
+                    sb.Append(mm.Groups[1].Value).Append(' ').Append(coder).Append(' ').Append(F(ratio)).Append(' ').Append(F(J)).Append(' ').Append(F(fr)).Append(' ').Append(iv ? 1 : 0).Append(' ').Append(F(mn)).Append(' ').Append(F(mx)).Append(' ').Append(F(coderOff)).Append('\n');
                 }
                 string pj = Path.GetFileName(mj); pj = pj.Substring(0, pj.Length - ".mech.json".Length);
                 File.WriteAllText(simDir + "/" + pj + ".agent-motors.txt", sb.ToString());

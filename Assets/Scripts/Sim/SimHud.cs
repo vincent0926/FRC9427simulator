@@ -133,6 +133,11 @@ namespace FrcSim
                 }
                 if (list.Count > 0)
                     GUI.Label(new Rect(cx - 330, 122 + list.Count * 24, 660, 22), L("[ / ] 或十字鍵左右 換選項   Tab 或十字鍵上下 換選單", "[ / ] or D-pad L/R: option   Tab or D-pad U/D: chooser"), Style(13, dim, TextAnchor.UpperCenter));
+                if (pm.StartInfo != "")
+                {
+                    Panel(new Rect(cx - 330, 92 + ph, 660, 26), 0.8f);
+                    GUI.Label(new Rect(cx - 330, 95 + ph, 660, 22), L("起點:", "Start: ") + pm.StartInfo, Style(14, Color.white, TextAnchor.UpperCenter));
+                }
             }
 
             // ---- 內建行為的 AUTO 階段:機器人跑內建自動路線(站位 + 目前步驟)

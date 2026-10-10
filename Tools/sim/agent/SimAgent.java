@@ -12,6 +12,7 @@ public class SimAgent {
 
     static class M {
         int id, coder;                // coder<0:沒有 CANcoder
+        double coderOffset;           // CANcoder 原始值的偏移(圈):= -MagnetOffset,程式看到的角度才會等於輪子真正的角度
         double inertia, friction, minRot, maxRot, ratio = RATIO;
         boolean invert;
         Object sim, coderSim;
@@ -35,6 +36,7 @@ public class SimAgent {
                     M m = new M(Integer.parseInt(t[0]), Integer.parseInt(t[1]), Double.parseDouble(t[3]), Double.parseDouble(t[4]),
                             t[5].equals("1"), Double.parseDouble(t[6]), Double.parseDouble(t[7]));
                     m.ratio = Double.parseDouble(t[2]);
+                    if (t.length > 8) m.coderOffset = Double.parseDouble(t[8]);
                     l.add(m);
                 }
                 if (!l.isEmpty()) { log("motor table from file: " + l.size() + " motors"); return l; }
@@ -158,7 +160,7 @@ public class SimAgent {
                     setPos.invoke(m.sim, m.pos);
                     setVel.invoke(m.sim, m.vel / (2 * Math.PI));
                     if (m.coderSim != null) {
-                        cPos.invoke(m.coderSim, m.pos / m.ratio);
+                        cPos.invoke(m.coderSim, m.pos / m.ratio + m.coderOffset);
                         cVel.invoke(m.coderSim, m.vel / (2 * Math.PI) / m.ratio);
                     }
                 }

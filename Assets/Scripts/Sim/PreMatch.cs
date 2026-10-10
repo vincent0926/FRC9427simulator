@@ -10,7 +10,9 @@ namespace FrcSim
     {
         public static PreMatch I;
         public NtChooser Nt;
-        public float AutoStartSeconds = 20f, NoChooserSeconds = 4f;
+        public float AutoStartSeconds = 20f, NoChooserSeconds = 10f;   // 程式常在連上幾秒後才把選單放上 SmartDashboard,太短會在選單出現前就開賽
+        public string StartInfo = "";   // HUD 用:機器人擺在哪個起點
+        string placedFor;               // 已經依哪個自動程式擺過車
         public bool Done { get; private set; }
         public int ChooserIndex;
         float connectedAt = -1f;
@@ -18,6 +20,29 @@ namespace FrcSim
 
         public bool Active => !Done && GameSession.Hal != null && GameSession.Hal.Connected;
         public float SecondsLeft => connectedAt < 0f ? AutoStartSeconds : Mathf.Max(0f, (HasChooser ? AutoStartSeconds : NoChooserSeconds) - (Time.unscaledTime - connectedAt));
+
+        // 把機器人擺到選的自動程式的起點(PathPlanner .auto);找不到就擺回站位。紅方依場地中心點對稱(和 PathPlanner 翻轉一致)
+        void PlaceForAuto(string autoName)
+        {
+            var d = GameSession.Drive; var hal = GameSession.Hal;
+            if (d == null || autoName == placedFor) return;
+            placedFor = autoName;
+            float x, y, h;
+            bool fromPath = PathPlannerStart.TryGet(hal != null ? hal.ProjectDir : null, autoName, out x, out y, out h);
+            if (fromPath)
+            {
+                if (AutoPlan.IsRed(GameSession.Station)) AutoPlan.Mirror(ref x, ref y, ref h);
+                StartInfo = $"{autoName}  ({x:0.00}, {y:0.00})  {h:0}°";
+            }
+            else
+            {
+                AutoPlan.StartPose(GameSession.Station, out x, out y, out h);
+                StartInfo = AutoPlan.Labels[GameSession.Station];
+            }
+            d.SetPose(new Vector2(x, y), h);
+            if (Nt != null) { Nt.StartX = x; Nt.StartY = y; Nt.StartDeg = h; }
+            Debug.Log($"[PreMatch] robot placed for auto '{autoName}': ({x:0.00},{y:0.00}) {h:0} deg fromPath={fromPath}");
+        }
         public bool HasChooser => Nt != null && Nt.Choosers.Count > 0;
 
         void Awake() { I = this; }
@@ -44,7 +69,7 @@ namespace FrcSim
                 return;
             }
             hal.Enabled = false;
-            if (connectedAt < 0f) connectedAt = Time.unscaledTime;
+            if (connectedAt < 0f && (Nt == null || Nt.Connected)) connectedAt = Time.unscaledTime;   // 倒數從 NetworkTables 連上才開始
             if (ScoreManager.MatchTime >= 30f) { StartMatch(); return; }   // 按了 N 跳過 AUTO
 
             var list = Nt != null ? Nt.Choosers : null;
@@ -65,6 +90,7 @@ namespace FrcSim
                 }
                 ChooserIndex = Mathf.Clamp(ChooserIndex, 0, list.Count - 1);
                 var cur = list[ChooserIndex];
+                PlaceForAuto(Current(list[0]));
                 if (!MenuSystem.Blocking)
                 {
                     if (Input.GetKeyDown(KeyCode.Tab) || Pad.Down(Pad.DDown)) ChooserIndex = (ChooserIndex + 1) % list.Count;

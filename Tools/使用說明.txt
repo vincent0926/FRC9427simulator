@@ -29,7 +29,7 @@
 - 內建自動路線(沒跑真實程式時):設定畫面「內建自動路線」選 依站位 / 只射預載 / 預載+DEPOT / 預載+中立區(穿過 TRENCH)/ 不動
 - 真實程式模式的開賽前:程式連上後機器人先 Disabled,畫面上列出你程式的自動程式選單(SendableChooser / PathPlanner buildAutoChooser)。
   [ / ] 或十字鍵左右 換選項,Tab 或十字鍵上下 換選單,Enter 或 A 開始比賽(20 秒後自動開始)。選項名稱和站位一樣(例如 Blue3)會自動選好
-- 機器人程式想從正確起點開始:把 Simobot-example\FrcSimPose.java 放進專案,autonomousInit 呼叫 FrcSimPose.startPose().ifPresent(drive::resetPose)
+- 機器人程式想從正確起點開始:把 Sim\robot-example\FrcSimPose.java 放進專案,autonomousInit 呼叫 FrcSimPose.startPose().ifPresent(drive::resetPose)
 - C:切換視角(跟隨 → 駕駛站 → 正上方 → 俯瞰);M:比賽提示音靜音;比賽結束會顯示成績單(AUTO / TELEOP / 總分)
 - C 切換視角,Esc 暫停,F1 按鍵說明,F3 詳細數據
 

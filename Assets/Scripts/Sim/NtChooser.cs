@@ -30,6 +30,7 @@ namespace FrcSim
         public string Status = "idle";
         public volatile bool Connected;
         public readonly ConcurrentDictionary<string, string> Strings = new ConcurrentDictionary<string, string>();
+        public readonly ConcurrentDictionary<string, double[]> Arrays = new ConcurrentDictionary<string, double[]>();   // 例如 Field/Robot = 程式自己估的位姿 {x, y, 度}
 
         readonly ConcurrentDictionary<string, Chooser> choosers = new ConcurrentDictionary<string, Chooser>();
         readonly ConcurrentDictionary<long, KeyValuePair<string, string>> topicById = new ConcurrentDictionary<long, KeyValuePair<string, string>>();
@@ -172,6 +173,12 @@ namespace FrcSim
             const string Root = "/SmartDashboard/";
             if (!topic.StartsWith(Root)) return;
             if (v is string sv) Strings[topic.Substring(Root.Length)] = sv;
+            else if (v is object[] arr && arr.Length > 0 && (arr[0] is double || arr[0] is long))
+            {
+                var dv = new double[arr.Length];
+                for (int i = 0; i < arr.Length; i++) dv[i] = Convert.ToDouble(arr[i]);
+                Arrays[topic.Substring(Root.Length)] = dv;
+            }
             int slash = topic.LastIndexOf('/');
             if (slash <= Root.Length) return;
             string name = topic.Substring(Root.Length, slash - Root.Length), key = topic.Substring(slash + 1);

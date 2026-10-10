@@ -77,7 +77,11 @@ namespace FrcSim
                         path += Vector2.Distance(pp, last); last = pp;
                         maxMove = Mathf.Max(maxMove, Vector2.Distance(pp, p0));
                         maxTurn = Mathf.Max(maxTurn, Mathf.Abs(Mathf.DeltaAngle(h0 * Mathf.Rad2Deg, GameSession.Drive.HeadingRad * Mathf.Rad2Deg)));
-                        if (Time.frameCount % 60 == 0 && trace.Length < 2000) trace.Append($"t={ScoreManager.MatchTime:0.0} ({pp.x:0.00},{pp.y:0.00}) ");
+                        if (Time.frameCount % 60 == 0 && trace.Length < 4000)
+                        {
+                            string code = GameSession.Chooser != null && GameSession.Chooser.Arrays.TryGetValue("Field/Robot", out var cp) && cp.Length >= 3 ? $"{cp[0]:0.00},{cp[1]:0.00},{cp[2]:0}" : "-";
+                            trace.Append($"\n  t={ScoreManager.MatchTime:0.0} true=({pp.x:0.00},{pp.y:0.00},{GameSession.Drive.HeadingRad * Mathf.Rad2Deg:0}) code=({code}) v={GameSession.Drive.Speed:0.00}");
+                        }
                     }
                     // AUTO 中途截圖(-autoshot 路徑):看機器人有沒有照自動路線動
                     string shotPath = Arg("-autoshot", null);

@@ -63,8 +63,9 @@ namespace FrcSim
 
         bool agentActive;
         bool followCodePose = true;   // mech.json chassis.followCodePose(預設開)
-        double gyroYawDeg;
+        double gyroYawDeg; float enabledAt = -1f;
         public bool FollowingCode { get; private set; }
+        public string FollowSource = "";
         // 馬達模擬就緒:agent 在機器人程式啟動約 8 秒後才開始推資料;還沒就緒就開 AUTO,路線(照時間跑)會在車子不能動時就跑掉
         public bool AgentReady { get { if (!agentActive) return true; lock (agentState) return agentState.Count > 0; } }
         // Java agent 每 ~8ms 經本機 TCP(3399)推來「id 位置 速度 …」一行;HALSim 的回聲更新不可靠,改用這條直連
@@ -295,15 +296,21 @@ namespace FrcSim
             ModuleHits = n;
             if (n < 2) return;
             double cvx = svx / n, cvy = svy / n, omega = omegaSign * srv / (srr == 0 ? 1 : srr);
+            float thNow = Drive.HeadingRad;
             Debug = $"chassis v=({cvx:0.00},{cvy:0.00}) w={omega:0.00}";
 
             // 跟隨模式:車子照「機器人程式自己估的位姿」(SmartDashboard Field2d)走。程式的里程計來自它自己的馬達與運動學,
             // 和 PathPlanner 規劃的路線一致;模擬器只負責把車開到那個位置(仍有剛體:會推球、會被牆擋)。
             // 陀螺儀:用模組速度算出的角速度自己積分(不能直接用車子的航向,否則航向和程式互相等待,永遠轉不了)。
             var nt = GameSession.Chooser;
-            if (followCodePose && Hal.Enabled && nt != null && nt.TryCodePose(out double tx, out double ty, out double tdeg))
+            // 目標:PathPlanner 正在跟的路線點(/PathPlanner/targetPose,就是你設計的路線);沒有 PathPlanner 才用程式自己估的位姿
+            double tx = 0, ty = 0, tdeg = 0;
+            bool havePath = nt != null && nt.TryPathTarget(out tx, out ty, out tdeg);
+            if (!Hal.Enabled) enabledAt = -1f; else if (enabledAt < 0f) enabledAt = Time.time;
+            // 沒有 PathPlanner 目標時才用程式估的位姿,而且要啟用 0.5 秒後(開賽瞬間程式的位姿常常還沒重置,會把車拖走)
+            bool haveTarget = havePath || (nt != null && enabledAt >= 0f && Time.time - enabledAt > 0.5f && !nt.SawPathPlanner && nt.TryCodePose(out tx, out ty, out tdeg));
+            if (followCodePose && Hal.Enabled && haveTarget)
             {
-                gyroYawDeg += omega * Mathf.Rad2Deg * dt;
                 const float tau = 0.1f;
                 Vector2 err = new Vector2((float)tx, (float)ty) - Drive.Pose2d;
                 Vector2 vf = err / tau;
@@ -312,12 +319,15 @@ namespace FrcSim
                 Drive.SimDriven = true;
                 Drive.SimVelField = vf;
                 Drive.SimOmega = Mathf.Clamp(herr / tau, -12f, 12f);
-                Debug += $" follow code=({tx:0.00},{ty:0.00},{tdeg:0}) gyro={gyroYawDeg:0}";
+                Debug += $" follow {(havePath ? "path" : "code")}=({tx:0.00},{ty:0.00},{tdeg:0})";
                 FollowingCode = true;
+                FollowSource = havePath ? "PathPlanner" : "Field2d";
+                // 陀螺儀 = 車子真正的航向(車子照路線轉,程式看到的航向就和路線一致;視覺也是真實位姿,程式的位姿會收斂到同一點)
                 if (gyro != null)
                 {
-                    Hal.QueueDevice("CANGyro", gyro, ">rawYawInput", gyroSign * gyroYawDeg, ">angularVelZ", gyroSign * omega * Mathf.Rad2Deg);
-                    SendYaw(gyroSign * gyroYawDeg, gyroSign * omega * Mathf.Rad2Deg);
+                    double yawDeg = gyroSign * thNow * Mathf.Rad2Deg, rateDeg = gyroSign * Drive.Omega * Mathf.Rad2Deg;
+                    Hal.QueueDevice("CANGyro", gyro, ">rawYawInput", yawDeg, ">angularVelZ", rateDeg);
+                    SendYaw(yawDeg, rateDeg);
                 }
                 return;
             }

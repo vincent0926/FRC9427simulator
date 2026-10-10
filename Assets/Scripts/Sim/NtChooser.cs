@@ -34,10 +34,10 @@ namespace FrcSim
         long codePoseStamp; public long CodePoseStamp { get => System.Threading.Interlocked.Read(ref codePoseStamp); set => System.Threading.Interlocked.Exchange(ref codePoseStamp, value); }
         public long NowMs => clock.ElapsedMilliseconds;
         // 程式自己估的位姿(Field2d "Field/Robot" 或任何 "<名稱>/Robot":{x, y, 度});超過 maxAgeMs 沒更新就當沒有
-        public bool TryCodePose(out double x, out double y, out double deg, long maxAgeMs = 500)
+        public bool TryCodePose(out double x, out double y, out double deg)
         {
             x = y = deg = 0;
-            if (NowMs - CodePoseStamp > maxAgeMs) return false;
+            if (CodePoseStamp == 0) return false;
             double[] best = null;
             if (!Arrays.TryGetValue("Field/Robot", out best))
                 foreach (var kv in Arrays) if (kv.Key.EndsWith("/Robot") && kv.Value.Length >= 3) { best = kv.Value; break; }
@@ -104,7 +104,7 @@ namespace FrcSim
                     try { await ws.ConnectAsync(new Uri("ws://127.0.0.1:5810/nt/frcsim-chooser"), ct); }
                     catch { await Task.Delay(1500, ct); continue; }
                     pubs.Clear(); topicById.Clear(); Connected = true; Status = "connected";
-                    var subs = new JArray(new JObject { ["method"] = "subscribe", ["params"] = new JObject { ["topics"] = new JArray("/SmartDashboard/"), ["subuid"] = 11, ["options"] = new JObject { ["prefix"] = true, ["periodic"] = 0.02 } } });
+                    var subs = new JArray(new JObject { ["method"] = "subscribe", ["params"] = new JObject { ["topics"] = new JArray("/SmartDashboard/", "/PathPlanner/"), ["subuid"] = 11, ["options"] = new JObject { ["prefix"] = true, ["periodic"] = 0.02 } } });
                     await SendText(subs.ToString(Newtonsoft.Json.Formatting.None), ct);
                     await SendBinary(TimeSync(), ct);
                     var recv = Task.Run(() => ReceiveLoop(ct));
@@ -183,8 +183,31 @@ namespace FrcSim
             catch { }
         }
 
+        // PathPlanner 正在跟的目標位姿(路線上「現在應該在的點」)
+        long ppStamp; double[] ppTarget;
+        public bool TryPathTarget(out double x, out double y, out double deg)
+        {
+            x = y = deg = 0;
+            var t = ppTarget;
+            if (t == null) return false;
+            x = t[0]; y = t[1]; deg = t[2];
+            return true;
+        }
+        public bool SawPathPlanner => ppTarget != null;
+        public long PathTargetAgeMs => NowMs - System.Threading.Interlocked.Read(ref ppStamp);
+
         void OnValue(string topic, object v)
         {
+            if (topic == "/PathPlanner/targetPose")
+            {
+                double[] pose = null;
+                if (v is byte[] raw && raw.Length >= 24)   // struct:Pose2d = x, y, 弧度(little-endian double)
+                    pose = new[] { BitConverter.ToDouble(raw, 0), BitConverter.ToDouble(raw, 8), BitConverter.ToDouble(raw, 16) * 180.0 / Math.PI };
+                else if (v is object[] a && a.Length >= 3)  // 舊版 double[] {x, y, 度}
+                    pose = new[] { Convert.ToDouble(a[0]), Convert.ToDouble(a[1]), Convert.ToDouble(a[2]) };
+                if (pose != null) { ppTarget = pose; System.Threading.Interlocked.Exchange(ref ppStamp, NowMs); }
+                return;
+            }
             const string Root = "/SmartDashboard/";
             if (!topic.StartsWith(Root)) return;
             if (v is string sv) Strings[topic.Substring(Root.Length)] = sv;

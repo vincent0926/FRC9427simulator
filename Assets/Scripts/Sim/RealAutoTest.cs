@@ -92,6 +92,23 @@ namespace FrcSim
                     yield return null;
                 }
                 sb.AppendLine($"during AUTO: max distance from start {maxMove:0.00} m, path {path:0.00} m, max turn {maxTurn:0} deg");
+                // 和 PathPlanner 路線比:每個取樣點離路線多遠(只算車子在動的時候)
+                var curves = PathCheck.Load(hal.ProjectDir, choice, AutoPlan.IsRed(GameSession.Station));
+                if (curves.Count > 0)
+                {
+                    float maxDev = 0f, sumDev = 0f; int nDev = 0;
+                    var tl = new StringBuilder();
+                    for (int si = 0; si < samples.Count; si++)
+                    {
+                        var smp = samples[si];
+                        float dev = PathCheck.Distance(curves, smp.P, out string which);
+                        if (smp.V > 0.3f) { maxDev = Mathf.Max(maxDev, dev); sumDev += dev; nDev++; }
+                        if (si % 3 == 0) tl.Append($"\n    t={smp.T:0.0} true=({smp.P.x:0.00},{smp.P.y:0.00},{Mathf.DeltaAngle(0, smp.H):0}) " + (smp.HasPP ? $"pp=({smp.PP.x:0.00},{smp.PP.y:0.00},{Mathf.DeltaAngle(0, smp.PH):0}) " : "") + (smp.HasC ? $"code=({smp.C.x:0.00},{smp.C.y:0.00},{Mathf.DeltaAngle(0, smp.CH):0}) " : "") + $"v={smp.V:0.0} near={which} dev={dev:0.00}");
+                    }
+                    sb.AppendLine($"path check ({curves.Count} paths): moving samples={nDev} avg deviation={(nDev > 0 ? sumDev / nDev : 0):0.00} m, max deviation={maxDev:0.00} m");
+                    sb.AppendLine("timeline:" + tl);
+                    Check(nDev > 10 && sumDev / Mathf.Max(1, nDev) < 0.35f && maxDev < 1.0f, "robot follows the PathPlanner route (avg < 0.35 m, max < 1.0 m)");
+                }
                 sb.AppendLine("trace: " + trace);
                 Warn2(maxMove > 0.5f, "robot drove during the user's auto");
                 Check(ScoreManager.Ended && ScoreManager.Phase == "AUTO DONE" && !hal.Enabled, $"auto mode ends after AUTO (phase={ScoreManager.Phase}, t={ScoreManager.MatchTime:0.0}, enabled={hal.Enabled})");
@@ -154,8 +171,21 @@ namespace FrcSim
 
         // 每幀時間:分「程式啟動中」和「已連線」兩段統計(視窗模式才有實際算圖)
         static readonly System.Collections.Generic.List<float> bootFrames = new System.Collections.Generic.List<float>(), liveFrames = new System.Collections.Generic.List<float>();
+        // AUTO 全程取樣(每 0.1 秒):比賽時間、真實位姿、程式估的位姿、速度
+        struct Sample { public float T, H, CH, V, PH; public Vector2 P, C, PP; public bool HasC, HasPP; }
+        static readonly System.Collections.Generic.List<Sample> samples = new System.Collections.Generic.List<Sample>();
+        float nextSample;
+
         void Update()
         {
+            if (AutoDrive.AutoPhase && GameSession.Drive != null && ScoreManager.MatchTime >= nextSample && samples.Count < 400)
+            {
+                nextSample = ScoreManager.MatchTime + 0.1f;
+                var s = new Sample { T = ScoreManager.MatchTime, P = GameSession.Drive.Pose2d, H = GameSession.Drive.HeadingRad * Mathf.Rad2Deg, V = GameSession.Drive.Speed };
+                if (GameSession.Chooser != null && GameSession.Chooser.TryCodePose(out double cx, out double cy, out double cd)) { s.C = new Vector2((float)cx, (float)cy); s.CH = (float)cd; s.HasC = true; }
+                if (GameSession.Chooser != null && GameSession.Chooser.TryPathTarget(out double px, out double py, out double pd)) { s.PP = new Vector2((float)px, (float)py); s.PH = (float)pd; s.HasPP = true; }
+                samples.Add(s);
+            }
             if (Time.frameCount < 60 || GameSession.Hal == null) return;
             (GameSession.Hal.Connected ? liveFrames : bootFrames).Add(Time.unscaledDeltaTime * 1000f);
         }

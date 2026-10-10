@@ -179,7 +179,8 @@
     ],
     "driveRatio": 5.27,
     "wheelRadius": 0.0508,
-    "gyro": "Pigeon 2 (v6)[11]"
+    "gyro": "Pigeon 2 (v6)[11]",
+    "intakeSide": "back"
   },
   "note": "9427newnewpro(swerve,Phoenix 6,PathPlanner):CAN ID、轉向齒比 287/11、輪徑 2in、模組位置和 FRC9427_offseasonBot 相同,只有驅動齒比 5.27(L3)。依 Constants.java SwerveConstants 對照。"
 }

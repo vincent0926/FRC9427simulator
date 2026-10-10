@@ -54,6 +54,7 @@ namespace FrcSim
         }
 
         static GameObject robot, robot2, score, hud;
+        static float modelYawExtra;   // intake 在車尾的機器人:模型多轉 180°
 
         public static void Begin(CameraRig rig, bool selfTest = false, string projectOverride = null)
         {
@@ -74,6 +75,7 @@ namespace FrcSim
             score.AddComponent<ScoreManager>();
             score.AddComponent<MatchAudio>();   // 開賽 / TELEOP / 終局 / 結束提示音(M 靜音)
 
+            modelYawExtra = 0f;
             Station = LegacyTestRun() ? 1 : ChosenStation();
             bool red = AutoPlan.IsRed(Station);
             robot = SimBootstrap.BuildRobot(out var turretVis, out var armVis, "Robot", red ? RedBody : BlueBody);
@@ -150,13 +152,23 @@ namespace FrcSim
                     nt.Drive = Drive; nt.Begin();
                 }
                 ms.MechPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Application.dataPath), "Sim", SimProject.Profile(proj) + ".mech.json");
+                // 設定檔寫 intake 在車尾(程式的前方是 shooter):吸球範圍、橘色手臂放到車尾,模型轉 180°
+                try
+                {
+                    if (System.IO.File.Exists(ms.MechPath))
+                    {
+                        var mj = Newtonsoft.Json.Linq.JObject.Parse(System.IO.File.ReadAllText(ms.MechPath));
+                        if ((string)mj["chassis"]?["intakeSide"] == "back") { Mech.IntakeDir = -1f; modelYawExtra = 180f; }
+                    }
+                }
+                catch (System.Exception e) { Debug.LogWarning("intakeSide: " + e.Message); }
             }
 
             // 匯入的機器人模型(沒有就用內建方塊)
             string model = RobotModels.Selected;
             Debug.Log($"[RobotModels] selected='{model}' dir={RobotModels.Dir} count={RobotModels.List().Length}");
             if (!string.IsNullOrEmpty(model))
-                RobotModels.Attach(robot.transform, model, RobotModels.YawDeg, ok =>
+                RobotModels.Attach(robot.transform, model, (RobotModels.YawDeg + modelYawExtra) % 360f, ok =>
                 {
                     if (!ok) Debug.LogWarning("robot model load failed: " + RobotModels.LastError);
                 });

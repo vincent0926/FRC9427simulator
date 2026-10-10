@@ -47,6 +47,8 @@ Unity (HalSim.cs / MechSim.cs / NtSim.cs)
 - 開賽前會等 simagent 開始推馬達資料(機器人程式啟動後約 8 秒)才開始 AUTO,否則照時間跑的路線會在車子還不能動時就跑掉。
 - Phoenix 6 的 Pigeon2 不吃 HALSim 輸入:航向經 simagent 寫進 Pigeon2 SimState(Unity → agent 的 TCP 行 `yaw <id> <度> <度/秒>`)。
 
+- 機器人程式的「前方」(PathPlanner 0°)是 shooter 那面時,在設定檔 `chassis.intakeSide` 寫 `"back"`:吸球範圍、橘色 intake 手臂放到車尾,匯入的模型多轉 180°(9427newnewpro、FRC9427swerve 已設定)。
+
 ## 內建射擊
 - 4 m 以內用機器人程式的查表(ShooterCalc);超過 4 m(過中線的遠射)固定 hood 20°,用彈道解(重力 + 0.375 線性阻力、60 Hz,和球的物理一致)算出剛好落進 HUB 中心的球速。`-shottest`:自己聯盟區到過中線 6 m,每點 8 顆全進。
 

@@ -14,6 +14,8 @@ namespace FrcSim
         public Transform ArmVisual;
 
         public bool IntakeDown;
+        // intake 在車頭(+1)還是車尾(-1)。機器人程式的「前方」(PathPlanner 0°)是 shooter 那面時,intake 在車尾:mech.json chassis.intakeSide = "back"
+        public float IntakeDir = 1f;
         public bool Shooting;
         public int Held = 8;                // 預載 8 顆
         public const int Capacity = 40;
@@ -63,7 +65,7 @@ namespace FrcSim
             if (TurretVisual != null) TurretVisual.localRotation = Quaternion.Euler(0f, -TurretRad * Mathf.Rad2Deg, 0f);
             if (ArmVisual != null)
             {
-                ArmVisual.localPosition = new Vector3(SimConstants.BumperLength / 2f + ArmExt * 0.5f - 0.02f, 0.02f, 0f);
+                ArmVisual.localPosition = new Vector3(IntakeDir * (SimConstants.BumperLength / 2f + ArmExt * 0.5f - 0.02f), 0.02f, 0f);
                 ArmVisual.localScale = new Vector3(0.05f + ArmExt, 0.10f, 0.62f);
             }
             if (ArmExt >= 0.2f && rollerRps > 10f && Held < Capacity) Collect();
@@ -89,7 +91,7 @@ namespace FrcSim
             float trigRps = Mathf.Abs((float)Sim.Vel("Talon FX (v6)[13]"));
             if (ArmVisual != null)
             {
-                ArmVisual.localPosition = new Vector3(SimConstants.BumperLength / 2f + ArmExt * 0.5f - 0.02f, 0.02f, 0f);
+                ArmVisual.localPosition = new Vector3(IntakeDir * (SimConstants.BumperLength / 2f + ArmExt * 0.5f - 0.02f), 0.02f, 0f);
                 ArmVisual.localScale = new Vector3(0.05f + ArmExt, 0.10f, 0.62f);
             }
             if (ArmExt >= 0.2f && rollerRps > 10f && Held < Capacity) Collect();
@@ -113,7 +115,7 @@ namespace FrcSim
             float armTarget = IntakeDown ? ArmMax : 0f;
             ArmExt = Mathf.MoveTowards(ArmExt, armTarget, ArmSpeed * dt);
             if (ArmVisual != null)
-                ArmVisual.localPosition = new Vector3(SimConstants.BumperLength / 2f + ArmExt * 0.5f - 0.02f, 0.02f, 0f);
+                ArmVisual.localPosition = new Vector3(IntakeDir * (SimConstants.BumperLength / 2f + ArmExt * 0.5f - 0.02f), 0.02f, 0f);
             if (ArmVisual != null)
                 ArmVisual.localScale = new Vector3(0.05f + ArmExt, 0.10f, 0.62f);
 
@@ -200,7 +202,7 @@ namespace FrcSim
 
         void Collect()
         {
-            Vector3 center = transform.TransformPoint(new Vector3(SimConstants.BumperLength / 2f + 0.22f, 0.05f, 0f));
+            Vector3 center = transform.TransformPoint(new Vector3(IntakeDir * (SimConstants.BumperLength / 2f + 0.22f), 0.05f, 0f));
             var hits = Physics.OverlapBox(center, new Vector3(0.28f, 0.14f, 0.34f), transform.rotation);
             foreach (var h in hits)
             {

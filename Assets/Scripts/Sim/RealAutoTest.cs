@@ -22,6 +22,7 @@ namespace FrcSim
             bool ok = true;
             void Check(bool c, string msg) { sb.AppendLine((c ? "ok   " : "FAIL ") + msg); ok &= c; }
             string choice = Arg("-choose", "Drive Forward");
+            if (int.TryParse(Arg("-camera", ""), out int camMode)) { var rigC = FindFirstObjectByType<CameraRig>(); if (rigC != null) rigC.Mode = camMode; }
             string chooserName = Arg("-chooser", "Auto Chooser");
             bool generic = chooserName != "Auto Chooser";   // 使用者自己的專案:沒有 SimTest/* 回報,只檢查選單與效能
             var hal = GameSession.Hal; var nt = GameSession.Chooser; var d = GameSession.Drive;
@@ -88,7 +89,8 @@ namespace FrcSim
                     }
                     // AUTO 中途截圖(-autoshot 路徑):看機器人有沒有照自動路線動
                     string shotPath = Arg("-autoshot", null);
-                    if (!shot && shotPath != null && ScoreManager.MatchTime > 8f) { shot = true; ScreenCapture.CaptureScreenshot(shotPath); }
+                    float shotAt = float.TryParse(Arg("-autoshottime", "8"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float sat) ? sat : 8f;
+                    if (!shot && shotPath != null && ScoreManager.MatchTime > shotAt) { shot = true; ScreenCapture.CaptureScreenshot(shotPath); }
                     yield return null;
                 }
                 sb.AppendLine($"during AUTO: max distance from start {maxMove:0.00} m, path {path:0.00} m, max turn {maxTurn:0} deg");

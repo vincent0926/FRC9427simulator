@@ -119,6 +119,26 @@ static class Program
             Check(w.Omega < 0f && Math.Abs(w.Omega) < 0.2f, $"heading error wraps around 180 deg (omega={w.Omega:0.000})");
         }
 
+        Console.WriteLine("Localization table (Loc.cs)");
+        {
+            // 重複的 key 會讓 Loc 靜態初始化丟例外 → 主選單整個黑畫面(v0.2.3 的 mode.auto)
+            string dir = AppContext.BaseDirectory, loc = null;
+            for (int up = 0; up < 8 && dir != null && loc == null; up++)
+            {
+                string c = System.IO.Path.Combine(dir, "Assets", "Scripts", "UI", "Loc.cs");
+                if (System.IO.File.Exists(c)) loc = c;
+                dir = System.IO.Path.GetDirectoryName(dir.TrimEnd('\\', '/'));
+            }
+            Check(loc != null, "found Assets/Scripts/UI/Loc.cs");
+            if (loc != null)
+            {
+                var keys = System.Text.RegularExpressions.Regex.Matches(System.IO.File.ReadAllText(loc), "\\{\\s*\"([^\"]+)\"\\s*,\\s*new\\[\\]");
+                var seen = new HashSet<string>(); var dups = new List<string>();
+                foreach (System.Text.RegularExpressions.Match m in keys) if (!seen.Add(m.Groups[1].Value)) dups.Add(m.Groups[1].Value);
+                Check(keys.Count > 20 && dups.Count == 0, $"Loc.cs has {keys.Count} keys, no duplicates{(dups.Count > 0 ? " (dup: " + string.Join(", ", dups) + ")" : "")}");
+            }
+        }
+
         Console.WriteLine($"\n{passes} passed, {fails} failed");
         Console.WriteLine(fails == 0 ? "PASS" : "FAIL");
         return fails == 0 ? 0 : 1;

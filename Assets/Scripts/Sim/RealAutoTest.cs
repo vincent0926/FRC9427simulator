@@ -18,7 +18,7 @@ namespace FrcSim
 
         IEnumerator Start()
         {
-            var sb = new StringBuilder();
+            var sb = new StringBuilder(); sbRef = sb;
             bool ok = true;
             void Check(bool c, string msg) { sb.AppendLine((c ? "ok   " : "FAIL ") + msg); ok &= c; }
             string choice = Arg("-choose", "Drive Forward");
@@ -67,8 +67,26 @@ namespace FrcSim
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-automode") >= 0)
             {
                 // 自動模式:AUTO 20 秒 + 3 秒寬限後結束、機器人 Disabled;再跑一次(Restart)程式要能重新連上
-                float te = Time.realtimeSinceStartup;
-                while (!ScoreManager.Ended && Time.realtimeSinceStartup - te < 40f) yield return null;
+                float te = Time.realtimeSinceStartup; float maxMove = 0f, maxTurn = 0f, path = 0f; Vector2 last = d.Pose2d; bool shot = false;
+                var trace = new StringBuilder();
+                while (!ScoreManager.Ended && Time.realtimeSinceStartup - te < 40f)
+                {
+                    if (GameSession.Drive != null)
+                    {
+                        var pp = GameSession.Drive.Pose2d;
+                        path += Vector2.Distance(pp, last); last = pp;
+                        maxMove = Mathf.Max(maxMove, Vector2.Distance(pp, p0));
+                        maxTurn = Mathf.Max(maxTurn, Mathf.Abs(Mathf.DeltaAngle(h0 * Mathf.Rad2Deg, GameSession.Drive.HeadingRad * Mathf.Rad2Deg)));
+                        if (Time.frameCount % 60 == 0 && trace.Length < 2000) trace.Append($"t={ScoreManager.MatchTime:0.0} ({pp.x:0.00},{pp.y:0.00}) ");
+                    }
+                    // AUTO 中途截圖(-autoshot 路徑):看機器人有沒有照自動路線動
+                    string shotPath = Arg("-autoshot", null);
+                    if (!shot && shotPath != null && ScoreManager.MatchTime > 8f) { shot = true; ScreenCapture.CaptureScreenshot(shotPath); }
+                    yield return null;
+                }
+                sb.AppendLine($"during AUTO: max distance from start {maxMove:0.00} m, path {path:0.00} m, max turn {maxTurn:0} deg");
+                sb.AppendLine("trace: " + trace);
+                Warn2(maxMove > 0.5f, "robot drove during the user's auto");
                 Check(ScoreManager.Ended && ScoreManager.Phase == "AUTO DONE" && !hal.Enabled, $"auto mode ends after AUTO (phase={ScoreManager.Phase}, t={ScoreManager.MatchTime:0.0}, enabled={hal.Enabled})");
                 nt.Strings.TryGetValue("SimTest/AutoRan", out string ran1);
                 Check(generic || ran1 == choice, $"robot code ran '{ran1}'");
@@ -142,6 +160,9 @@ namespace FrcSim
             int h = 0; foreach (var x in f) if (x > 50f) h++;
             return $"{name}: frames={f.Count} avg={avg:0.0} ms p95={f[(int)(f.Count * 0.95f)]:0.0} ms p99={f[(int)(f.Count * 0.99f)]:0.0} ms max={f[f.Count - 1]:0.0} ms hitches(>50ms)={h}";
         }
+
+        void Warn2(bool c, string msg) { lastWarn = (c ? "ok   " : "WARN ") + msg; sbRef?.AppendLine(lastWarn); }
+        StringBuilder sbRef; string lastWarn;
 
         static void Finish(StringBuilder sb, bool ok)
         {

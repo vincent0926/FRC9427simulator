@@ -31,7 +31,6 @@ namespace FrcSim
             { "auto.pick",     new[]{ "點選選擇專案資料夾", "click to choose project folder" } },
             { "auto.start",    new[]{ "開始自動模式", "Start Auto" } },
             { "mode.match",    new[]{ "比賽模式(即將推出)", "Match Mode (coming soon)" } },
-            { "mode.auto",     new[]{ "自動階段練習(即將推出)", "Autonomous Practice (coming soon)" } },
             { "set.title",     new[]{ "設定", "Settings" } },
             { "set.lang",      new[]{ "語言", "Language" } },
             { "set.fps",       new[]{ "FPS 上限", "FPS limit" } },

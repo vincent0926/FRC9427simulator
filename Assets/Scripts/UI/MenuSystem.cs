@@ -287,7 +287,7 @@ namespace FrcSim
                 {
                     PlayerPrefs.SetInt("station", (AutoPlan.Clamp(PlayerPrefs.GetInt("station", 1)) + 1) % AutoPlan.Count); PlayerPrefs.Save();
                 }),
-                new Item(() => Loc.T("setup.routine") + ":  " + (Loc.Lang == "zh" ? AutoPlan.RoutineLabelsZh : AutoPlan.RoutineLabelsEn)[(int)AutoPlan.ClampRoutine(PlayerPrefs.GetInt("autoRoutine", 0))], () =>
+                new Item(() => PlayerPrefs.GetInt("useRealCode", 0) == 1 ? Loc.T("setup.routine.real") : Loc.T("setup.routine") + ":  " + (Loc.Lang == "zh" ? AutoPlan.RoutineLabelsZh : AutoPlan.RoutineLabelsEn)[(int)AutoPlan.ClampRoutine(PlayerPrefs.GetInt("autoRoutine", 0))], () =>
                 {
                     PlayerPrefs.SetInt("autoRoutine", ((int)AutoPlan.ClampRoutine(PlayerPrefs.GetInt("autoRoutine", 0)) + 1) % AutoPlan.RoutineCount); PlayerPrefs.Save();
                 }),

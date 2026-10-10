@@ -167,8 +167,12 @@ namespace FrcSim
         void OnDestroy() { Stop(); if (I == this) I = null; }
         void OnApplicationQuit() { Stop(); }
 
+        static Process pendingKill;
+        StreamWriter logWriter;   // 結束時要關掉:原本一直開著,同一次執行裡第二場比賽就開不了這個 log 檔(Sharing violation)
+
         public void Stop()
         {
+            try { var lw = logWriter; logWriter = null; if (lw != null) lock (lw) lw.Dispose(); } catch { }
             try { cts?.Cancel(); } catch { }
             try { ws?.Abort(); } catch { }
             try
@@ -187,7 +191,7 @@ namespace FrcSim
                 var ps = new ProcessStartInfo("powershell",
                     "-NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='java.exe'\\\" | Where-Object { $_.CommandLine -match 'frc\\.robot|robotRunMain|simulateJava|halsim' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\"")
                 { CreateNoWindow = true, UseShellExecute = false };
-                Process.Start(ps);
+                pendingKill = Process.Start(ps);   // 下一場開始前會等它跑完,否則舊的機器人程式還佔著 log 檔 / 連線埠
             }
             catch { }
         }
@@ -197,6 +201,8 @@ namespace FrcSim
             try
             {
                 Status = "starting robot code";
+                // 上一場的機器人程式還在關:等它結束(最多 15 秒),不然新程式開不了 log 檔、HALSim 連線埠也被佔住
+                try { var pk = pendingKill; if (pk != null && !pk.HasExited) pk.WaitForExit(15000); } catch { }
                 logPath = Path.Combine(Path.GetTempPath(), SimPorts.Offset != 0 ? "frc9427-sim-robot-p" + SimPorts.Offset + ".log" : "frc9427-sim-robot.log");
                 string init = Path.Combine(Path.GetTempPath(), "frc9427-enable-ws.init.gradle");
                 File.WriteAllText(init, InitScript);
@@ -230,9 +236,17 @@ namespace FrcSim
                 if (SimPorts.Offset != 0) psi.EnvironmentVariables["JAVA_TOOL_OPTIONS"] += " -Dsimagent.port=" + (3399 + SimPorts.Offset);
                 psi.EnvironmentVariables["HALSIMWS_FILTERS"] = "CANMotor,CANEncoder,CANGyro,Gyro,DriverStation";
                 gradle = Process.Start(psi);
-                var w = new StreamWriter(logPath, false);
-                gradle.OutputDataReceived += (s, e) => { if (e.Data != null) lock (w) { w.WriteLine(e.Data); w.Flush(); } };
-                gradle.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (w) { w.WriteLine(e.Data); w.Flush(); } };
+                StreamWriter w;
+                try { w = new StreamWriter(logPath, false); }
+                catch (IOException)
+                {
+                    // log 檔還被別的程序開著(例如使用者另外開的模擬器):換一個檔名,不要因此整個啟動失敗
+                    logPath = Path.Combine(Path.GetTempPath(), "frc9427-sim-robot-" + DateTime.Now.ToString("HHmmss") + ".log");
+                    w = new StreamWriter(logPath, false);
+                }
+                logWriter = w;
+                gradle.OutputDataReceived += (s, e) => { if (e.Data != null) lock (w) { try { w.WriteLine(e.Data); w.Flush(); } catch (ObjectDisposedException) { } } };
+                gradle.ErrorDataReceived += (s, e) => { if (e.Data != null) lock (w) { try { w.WriteLine(e.Data); w.Flush(); } catch (ObjectDisposedException) { } } };
                 gradle.BeginOutputReadLine();
                 gradle.BeginErrorReadLine();
 

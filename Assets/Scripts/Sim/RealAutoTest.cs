@@ -22,6 +22,8 @@ namespace FrcSim
             bool ok = true;
             void Check(bool c, string msg) { sb.AppendLine((c ? "ok   " : "FAIL ") + msg); ok &= c; }
             string choice = Arg("-choose", "Drive Forward");
+            string chooserName = Arg("-chooser", "Auto Chooser");
+            bool generic = chooserName != "Auto Chooser";   // 使用者自己的專案:沒有 SimTest/* 回報,只檢查選單與效能
             var hal = GameSession.Hal; var nt = GameSession.Chooser; var d = GameSession.Drive;
             Check(hal != null && nt != null && PreMatch.I != null, "real-code mode with chooser client and pre-match");
             if (hal == null || nt == null || PreMatch.I == null) { Finish(sb, false); yield break; }
@@ -36,11 +38,11 @@ namespace FrcSim
             NtChooser.Chooser ch = null;
             while (Time.realtimeSinceStartup - t1 < 30f)
             {
-                foreach (var c in nt.Choosers) if (c.Name == "Auto Chooser") ch = c;
-                if (ch != null && ch.Options.Length >= 3) break;
+                foreach (var c in nt.Choosers) if (c.Name == chooserName) ch = c;
+                if (ch != null && ch.Options.Length >= (generic ? 1 : 3)) break;
                 yield return null;
             }
-            Check(ch != null, $"found SmartDashboard 'Auto Chooser' (options: {(ch == null ? "-" : string.Join(", ", ch.Options))})");
+            Check(ch != null, $"found SmartDashboard '{chooserName}' (options: {(ch == null ? "-" : string.Join(", ", ch.Options))})");
             Check(PreMatch.I.Active && !hal.Enabled && ScoreManager.MatchTime == 0f, "pre-match: robot disabled, match clock not started");
             if (ch == null) { Finish(sb, false); yield break; }
 
@@ -62,6 +64,13 @@ namespace FrcSim
             sb.AppendLine($"during AUTO: max |motorVoltage[3]|={maxV:0.00} V, max speed={maxVl:0.00} m/s, mechsim at max: {sample}, enabled={hal.Enabled} auto={hal.Autonomous}");
             Check(ScoreManager.MatchTime > 3f && ScoreManager.Phase == "AUTO", $"match running in AUTO (t={ScoreManager.MatchTime:0.0})");
 
+            if (generic)
+            {
+                yield return new WaitForSecondsRealtime(10f);   // 多跑一點時間收集效能數據
+                sb.AppendLine($"robot moved {(d.Pose2d - p0).magnitude:0.00} m; mechsim: {(d.GetComponent<MechSim>() != null ? d.GetComponent<MechSim>().Info : "none")}");
+                Finish(sb, ok);
+                yield break;
+            }
             nt.Strings.TryGetValue("SimTest/AutoRan", out string ran);
             nt.Strings.TryGetValue("SimTest/Alliance", out string alliance);
             nt.Strings.TryGetValue("SimTest/StartPose", out string start);
@@ -97,8 +106,27 @@ namespace FrcSim
             Finish(sb, ok);
         }
 
+        // 每幀時間:分「程式啟動中」和「已連線」兩段統計(視窗模式才有實際算圖)
+        static readonly System.Collections.Generic.List<float> bootFrames = new System.Collections.Generic.List<float>(), liveFrames = new System.Collections.Generic.List<float>();
+        void Update()
+        {
+            if (Time.frameCount < 60 || GameSession.Hal == null) return;
+            (GameSession.Hal.Connected ? liveFrames : bootFrames).Add(Time.unscaledDeltaTime * 1000f);
+        }
+        static string Stats(string name, System.Collections.Generic.List<float> l)
+        {
+            if (l.Count == 0) return name + ": no frames";
+            var f = new System.Collections.Generic.List<float>(l); f.Sort();
+            float avg = 0f; foreach (var x in f) avg += x; avg /= f.Count;
+            int h = 0; foreach (var x in f) if (x > 50f) h++;
+            return $"{name}: frames={f.Count} avg={avg:0.0} ms p95={f[(int)(f.Count * 0.95f)]:0.0} ms p99={f[(int)(f.Count * 0.99f)]:0.0} ms max={f[f.Count - 1]:0.0} ms hitches(>50ms)={h}";
+        }
+
         static void Finish(StringBuilder sb, bool ok)
         {
+            sb.AppendLine(Stats("perf while robot code boots", bootFrames));
+            sb.AppendLine(Stats("perf while connected", liveFrames));
+            if (GameSession.Hal != null) sb.AppendLine($"halsim: maxBacklog={GameSession.Hal.MaxBacklog} maxDt={GameSession.Hal.MaxDt * 1000f:0} ms");
             File.WriteAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), "realautotest.txt"), sb.ToString() + (ok ? "PASS" : "FAIL") + "\n");
             AutoTest.RestorePrefsPublic();
             Application.Quit();

@@ -52,12 +52,15 @@ namespace FrcSim
             {
                 if (!restored)
                 {
-                    // 上次在這個選單選過的選項,還在清單裡就自動帶入
+                    // 1. 有選項的名稱就是站位(例如 PathPlanner 的 "Blue3.auto" → "Blue3")→ 自動選它
+                    // 2. 否則用上次在這個選單選過的選項(還在清單裡的話)
                     restored = true;
                     foreach (var c in list)
                     {
+                        string byStation = MatchStation(c.Options, GameSession.Station);
                         string prev = PlayerPrefs.GetString(NtChooser.PrefKey(c.Name), "");
-                        if (prev != "" && System.Array.IndexOf(c.Options, prev) >= 0) Nt.Select(c, prev);
+                        if (byStation != null) Nt.Select(c, byStation);
+                        else if (prev != "" && System.Array.IndexOf(c.Options, prev) >= 0) Nt.Select(c, prev);
                     }
                 }
                 ChooserIndex = Mathf.Clamp(ChooserIndex, 0, list.Count - 1);
@@ -79,6 +82,16 @@ namespace FrcSim
             }
             if (!MenuSystem.Blocking && (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter) || Pad.Down(Pad.A))) { StartMatch(); return; }
             if (SecondsLeft <= 0f) StartMatch();
+        }
+
+        static string Norm(string s) { var sb = new System.Text.StringBuilder(); foreach (char ch in s.ToLowerInvariant()) if (char.IsLetterOrDigit(ch)) sb.Append(ch); return sb.ToString(); }
+
+        // 名稱和站位一樣的選項("Blue3"、"blue 3"、"Blue-3" 都算);沒有就 null
+        public static string MatchStation(string[] options, int station)
+        {
+            string want = Norm(AutoPlan.Labels[AutoPlan.Clamp(station)]);
+            foreach (var o in options) if (Norm(o) == want) return o;
+            return null;
         }
 
         // 目前會跑的選項:使用者選的 > 程式回報的 active > default

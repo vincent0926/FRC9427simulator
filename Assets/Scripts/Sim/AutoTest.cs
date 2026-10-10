@@ -51,6 +51,7 @@ namespace FrcSim
                 Application.Quit();
                 yield break;
             }
+            firstAttachMs = RobotModels.LastAttachMs;
             var d = GameSession.Drive; var m = GameSession.Mech;
             var a1 = GameSession.Auto; var a2 = GameSession.Auto2;
             Check(a1 != null && a2 != null, "both robots have AutoDrive");
@@ -80,9 +81,72 @@ namespace FrcSim
             }
             Check(!a1.Running && !a2.Running, "auto stopped after AUTO phase");
 
+            // 比賽提示音 + 結束成績單:把時鐘快轉到各階段交界
+            Check(MatchAudio.Cues.Contains("start"), "match-start cue played");
+            int blueAuto = ScoreManager.BlueScore, redAuto = ScoreManager.RedScore;
+            Check(ScoreManager.BlueAuto == blueAuto && ScoreManager.RedAuto == redAuto, $"AUTO points recorded for the summary (blue {ScoreManager.BlueAuto}, red {ScoreManager.RedAuto})");
+            ScoreManager.MatchTime = 29.5f; yield return new WaitForSeconds(1.5f);
+            ScoreManager.MatchTime = 129.5f; yield return new WaitForSeconds(1.5f);
+            ScoreManager.MatchTime = 159.5f; yield return new WaitForSeconds(1.5f);
+            ScoreManager.MatchTime = 162.8f; yield return new WaitForSeconds(1.0f);
+            sb.AppendLine("cues: " + MatchAudio.Cues);
+            Check(MatchAudio.Cues.Contains("teleop") && MatchAudio.Cues.Contains("endgame") && MatchAudio.Cues.Contains("buzzer"), "teleop / endgame / end-buzzer cues played");
+            Check(ScoreManager.Ended && ScoreManager.BlueAuto == blueAuto, "match ended; summary keeps AUTO points");
+
+            // 匯入的機器人模型:零件合併成少數網格(卡頓主因是 573 個零件各自一次 draw call)
+            if (RobotModels.Selected != "")
+            {
+                sb.AppendLine($"robot model {RobotModels.Selected}: draw parts {RobotModels.LastDrawParts}");
+                if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-nomerge") < 0) Check(RobotModels.LastDrawParts > 0 && RobotModels.LastDrawParts < 80, "robot model merged into < 80 meshes");
+                firstAttachMs = RobotModels.LastAttachMs;
+                sb.AppendLine($"first model load: {firstAttachMs} ms");
+                // 第二次掛同一個模型(像下一場比賽):要用快取樣板,幾乎不花時間
+                var dummy = new GameObject("CacheProbe"); bool done2 = false, ok2 = false;
+                RobotModels.Attach(dummy.transform, RobotModels.Selected, RobotModels.YawDeg, r => { ok2 = r; done2 = true; });
+                float tc = Time.realtimeSinceStartup;
+                while (!done2 && Time.realtimeSinceStartup - tc < 10f) yield return null;
+                Check(ok2 && RobotModels.LastAttachMs < 300, $"next match reuses cached model ({RobotModels.LastAttachMs} ms)");
+                Check(dummy.transform.Find("ModelPivot") != null && dummy.GetComponentsInChildren<MeshRenderer>().Length < 80, "cached copy has the merged meshes");
+                Destroy(dummy);
+            }
+
+            if (Perf) sb.AppendLine(PerfLine());
+
+            // 再開一場(像回主選單後按開始):開賽那一幀不能卡,之後幾秒也不能有大於 100 ms 的卡頓
+            var rig = FindFirstObjectByType<CameraRig>();
+            if (rig != null)
+            {
+                GameSession.End(rig);
+                yield return null;
+                var swb = System.Diagnostics.Stopwatch.StartNew();
+                GameSession.Begin(rig);
+                long beginMs = swb.ElapsedMilliseconds;
+                worstFrame = 0f;
+                yield return new WaitForSeconds(4f);
+                sb.AppendLine($"second match: Begin() {beginMs} ms, worst frame in next 4 s {worstFrame:0} ms, model attach {RobotModels.LastAttachMs} ms");
+                Check(beginMs < 500 && worstFrame < 150f, "starting the next match does not freeze");
+            }
             File.WriteAllText(Path.Combine(Path.GetDirectoryName(Application.dataPath), "autotest.txt"), sb.ToString() + (ok ? "PASS" : "FAIL") + "\n");
             RestorePrefs();
             Application.Quit();
+        }
+
+        // -perf:記錄每幀時間(視窗模式才有實際算圖),結果寫在 autotest.txt
+        readonly System.Collections.Generic.List<float> frames = new System.Collections.Generic.List<float>();
+        float firstAttachMs, worstFrame;
+        static bool Perf => System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-perf") >= 0;
+        void Update()
+        {
+            if (Time.frameCount > 2) worstFrame = Mathf.Max(worstFrame, Time.unscaledDeltaTime * 1000f);
+            if (Perf && Time.frameCount > 60 && ScoreManager.Phase == "AUTO") frames.Add(Time.unscaledDeltaTime * 1000f);
+        }
+        string PerfLine()
+        {
+            if (frames.Count == 0) return "perf: no frames";
+            var f = new System.Collections.Generic.List<float>(frames); f.Sort();
+            float avg = 0f; foreach (var x in f) avg += x; avg /= f.Count;
+            int hitches = 0; foreach (var x in f) if (x > 50f) hitches++;
+            return $"perf: worst frame since start={worstFrame:0} ms; frames={f.Count} avg={avg:0.0} ms p95={f[(int)(f.Count * 0.95f)]:0.0} ms max={f[f.Count - 1]:0.0} ms hitches(>50ms)={hitches} drawParts={RobotModels.LastDrawParts}";
         }
     }
 }

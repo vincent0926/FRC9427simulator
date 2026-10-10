@@ -12,11 +12,12 @@ namespace FrcSim
         float chaseYaw; bool chaseInit;
         float orbitT;
 
-        public string ModeName => Mode == 0 ? "overview" : Mode == 1 ? "chase" : "top-down";
+        public string ModeName => Mode == 0 ? "overview" : Mode == 1 ? "chase" : Mode == 6 ? "driver station" : "top-down";
+        static readonly int[] Cycle = { 1, 6, 2, 0 };   // C:跟隨 → 駕駛站 → 正上方 → 俯瞰
 
         void Update()
         {
-            if (!Orbit && !MenuSystem.Blocking && Input.GetKeyDown(KeyCode.C)) Mode = (Mode + 1) % 3;
+            if (!Orbit && !MenuSystem.Blocking && Input.GetKeyDown(KeyCode.C)) Mode = Cycle[(System.Array.IndexOf(Cycle, Mode) + 1) % Cycle.Length];
         }
 
         void LateUpdate()
@@ -59,6 +60,15 @@ namespace FrcSim
                 }
                 if (nearest < dCam) pos = org + toCam / dCam * Mathf.Max(0.9f, nearest - 0.15f) + Vector3.up * 0.8f;
                 rot = Quaternion.LookRotation(Target.position + fwdC * 0.9f - pos, Vector3.up);
+            }
+            else if (Mode == 6)
+            {
+                // 駕駛站視角:站在自己聯盟牆後、駕駛眼睛高度(約 1.7 m),跟著機器人轉頭,和實際比賽看出去的角度一樣
+                AutoPlan.StartPose(GameSession.Station, out _, out float sy, out _);
+                float wallX = red ? L + 0.6f : -0.6f;
+                pos = new Vector3(wallX, 1.7f, sy);
+                Vector3 look = Target.position - pos; look.y = Mathf.Min(look.y, -0.6f);
+                rot = Quaternion.LookRotation(look, Vector3.up);
             }
             else if (Mode == 5)
             {

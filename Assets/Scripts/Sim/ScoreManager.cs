@@ -7,6 +7,7 @@ namespace FrcSim
     public class ScoreManager : MonoBehaviour
     {
         public static int BlueScore, RedScore;
+        public static int BlueAuto, RedAuto;   // AUTO 階段得分(比賽結束的成績單用)
         const float ScoreBandTop = 1.80f, ScoreBandBottom = 1.62f;
         const float Half = 0.50f;
 
@@ -52,7 +53,7 @@ namespace FrcSim
 
         void Awake()
         {
-            BlueScore = RedScore = 0;
+            BlueScore = RedScore = 0; BlueAuto = RedAuto = 0;
             MatchTime = 0f; Ended = false; BlueWonAuto = true;
             ClockOn = PlayerPrefs.GetInt("matchClock", 1) == 1 && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-noclock") < 0;
             float L = SimConstants.FieldLength, W = SimConstants.FieldWidth;
@@ -86,7 +87,7 @@ namespace FrcSim
                 if (!inBlue && !inRed) continue;
 
                 bool active = inBlue ? BlueActive : RedActive;
-                if (active) { if (inBlue) BlueScore++; else RedScore++; }
+                if (active) { if (inBlue) BlueScore++; else RedScore++; if (Phase == "AUTO") { if (inBlue) BlueAuto++; else RedAuto++; } }
                 // 吐回場上:朝中立區那一側的底部出口
                 Vector2 hub = inBlue ? blueHub : redHub;
                 float dir = inBlue ? 1f : -1f;

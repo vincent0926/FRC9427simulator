@@ -148,6 +148,7 @@ namespace FrcSim
 
             if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-shot") >= 0)
                 new GameObject("AutoShot").AddComponent<AutoShot>().Rig = rig;
+            RobotModels.Preload();   // 主選單時就先在背景載好機器人模型,開賽不用等(原本開賽會卡 2~3 秒)
             var menu = new GameObject("Menu").AddComponent<MenuSystem>();
             menu.Rig = rig;
         }

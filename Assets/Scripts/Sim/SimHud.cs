@@ -139,6 +139,20 @@ namespace FrcSim
                 GUI.Label(new Rect(cx - 300, 93, 600, 26), L($"自動階段({AutoPlan.Labels[GameSession.Station]}):內建自動路線 {stp},手把暫時無效 — 按 N 跳過", $"AUTO ({AutoPlan.Labels[GameSession.Station]}): built-in routine {stp}, sticks disabled — press N to skip"), Style(15, new Color(1f, 0.9f, 0.4f), TextAnchor.UpperCenter, FontStyle.Bold));
             }
 
+            // ---- 比賽結束成績單:AUTO / TELEOP / 總分、勝負
+            if (ScoreManager.ClockOn && ScoreManager.Ended)
+            {
+                int bt = ScoreManager.BlueScore - ScoreManager.BlueAuto, rt = ScoreManager.RedScore - ScoreManager.RedAuto;
+                string win = ScoreManager.BlueScore > ScoreManager.RedScore ? L("藍方獲勝", "BLUE WINS") : ScoreManager.RedScore > ScoreManager.BlueScore ? L("紅方獲勝", "RED WINS") : L("平手", "TIE");
+                Panel(new Rect(cx - 220, H * 0.30f, 440, 170), 0.85f);
+                GUI.Label(new Rect(cx - 220, H * 0.30f + 10, 440, 34), win, Style(26, new Color(1f, 0.9f, 0.4f), TextAnchor.UpperCenter, FontStyle.Bold));
+                var cs = Style(17, Color.white, TextAnchor.UpperCenter);
+                GUI.Label(new Rect(cx - 220, H * 0.30f + 52, 440, 24), L("             藍      紅", "             BLUE   RED"), Style(17, dim, TextAnchor.UpperCenter));
+                GUI.Label(new Rect(cx - 220, H * 0.30f + 78, 440, 24), $"AUTO        {ScoreManager.BlueAuto,4}   {ScoreManager.RedAuto,4}", cs);
+                GUI.Label(new Rect(cx - 220, H * 0.30f + 102, 440, 24), $"TELEOP      {bt,4}   {rt,4}", cs);
+                GUI.Label(new Rect(cx - 220, H * 0.30f + 128, 440, 26), $"{L("總分", "TOTAL")}        {ScoreManager.BlueScore,4}   {ScoreManager.RedScore,4}", Style(18, Color.white, TextAnchor.UpperCenter, FontStyle.Bold));
+            }
+
             // ---- 真實程式啟動中提示
             if (GameSession.Hal != null && !GameSession.Hal.Connected && !GameSession.Hal.Starting)
             {
@@ -179,7 +193,7 @@ namespace FrcSim
                     ? L("手把:左/右搖桿 = 左/右側輪   A 放手臂   B 滾輪   RT 發射   RB 送球   十字鍵左右 砲塔   Start 暫停",
                         "Pad: L/R stick = left/right side   A arm   B roller   RT shoot   RB feed   D-pad L/R turret   Start pause")
                     : L("WASD 移動   Q/E 旋轉   Shift 慢速   I 吸球   空白/滑鼠 射擊   F 場地/車體座標", "WASD move   Q/E rotate   Shift slow   I intake   Space/Mouse shoot   F field/robot");
-                string t2 = L("H 人類球員放球   C 視角   R 重置   Esc 暫停   2P:方向鍵移動  ,. 旋轉  / 吸球  右Ctrl 射擊  \\ 放球", "H human-player chute   C camera   R reset   Esc pause   P2: arrows move  ,. rotate  / intake  RCtrl shoot  \\ chute");
+                string t2 = L("H 人類球員放球   C 視角   M 靜音   R 重置   Esc 暫停   2P:方向鍵移動  ,. 旋轉  / 吸球  右Ctrl 射擊  \\ 放球", "H human-player chute   C camera   M mute   R reset   Esc pause   P2: arrows move  ,. rotate  / intake  RCtrl shoot  \\ chute");
                 float hw = Mathf.Min(W - 20, 1100);
                 Panel(new Rect(cx - hw / 2f, H - 62, hw, 52), 0.6f);
                 var hs = Style(14, dim);

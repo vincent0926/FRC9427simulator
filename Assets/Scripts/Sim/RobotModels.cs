@@ -47,10 +47,54 @@ namespace FrcSim
 
         public static string LastError = "";
 
+        // 載好、合併好的模型留一份樣板(停用、不會被場景切換刪掉):之後每場比賽直接複製,不用再讀 45 MB 的 glb
+        // (原本每次開賽都重新載入,開賽瞬間會卡 2~3 秒)
+        static GameObject template; static string templateKey;
+        public static bool Loading { get; private set; }
+        public static float LastAttachMs;   // 測試用:上一次掛模型花的時間
+
+        static string Key(string file, float yawDeg) => file + "|" + yawDeg.ToString("0.0");
+
+        static void HideBuiltin(Transform robot)
+        {
+            foreach (var n in new[] { "Body", "IntakeArm", "Turret" })
+            {
+                var t = robot.Find(n);
+                if (t != null) t.gameObject.SetActive(false);
+            }
+        }
+
+        // 在主選單時先在背景載好目前選的模型,開賽時就不用等
+        public static void Preload()
+        {
+            string file = Selected;
+            if (string.IsNullOrEmpty(file) || Loading || (template != null && templateKey == Key(file, YawDeg))) return;
+            var dummy = new GameObject("ModelPreload");
+            dummy.transform.position = new Vector3(0f, -50f, 0f);
+            Attach(dummy.transform, file, YawDeg, ok => UnityEngine.Object.Destroy(dummy));
+        }
+
         // 載入並掛到機器人底下,貼地置中。成功後隱藏內建方塊外觀。
         public static async void Attach(Transform robot, string file, float yawDeg, Action<bool> done)
         {
             bool ok = false;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            string key = Key(file, yawDeg);
+            // 預載還沒好:等它(最多 30 秒),再用樣板
+            while (Loading && template == null && sw.ElapsedMilliseconds < 30000) await System.Threading.Tasks.Task.Yield();
+            if (template != null && templateKey == key)
+            {
+                if (robot == null) { done?.Invoke(false); return; }
+                var copy = UnityEngine.Object.Instantiate(template, robot, false);
+                copy.name = "ModelPivot";
+                copy.SetActive(true);
+                HideBuiltin(robot);
+                LastAttachMs = sw.ElapsedMilliseconds;
+                Debug.Log($"[RobotModels] attached cached model in {LastAttachMs} ms");
+                done?.Invoke(true);
+                return;
+            }
+            Loading = true;
             try
             {
                 var path = Path.Combine(Dir, file);
@@ -73,18 +117,86 @@ namespace FrcSim
                     {
                         Fix(root, robot, yawDeg);
                         ok = true;
+                        // 留樣板:合併後的網格在 ModelPivot 底下(機器人座標),和機器人位置/朝向無關
+                        if (template != null) UnityEngine.Object.Destroy(template);
+                        template = UnityEngine.Object.Instantiate(pivot);
+                        template.name = "ModelTemplate";
+                        template.transform.localPosition = pivot.transform.localPosition;   // 複製到機器人底下時用的是 local 值
+                        template.transform.localRotation = Quaternion.identity;
+                        template.transform.localScale = Vector3.one;
+                        // 零件全部合併了:樣板裡不用留原本數百個(已停用的)零件,複製會快很多
+                        var tr = template.transform.Find("ModelRoot");
+                        if (tr != null && tr.GetComponentsInChildren<Renderer>(false).Length == 0) UnityEngine.Object.Destroy(tr.gameObject);
+                        template.SetActive(false);
+                        UnityEngine.Object.DontDestroyOnLoad(template);
+                        templateKey = key;
                     }
                     else UnityEngine.Object.Destroy(root);
                 }
                 else LastError = "load failed";
             }
             catch (Exception e) { LastError = e.Message; Debug.LogError("RobotModels: " + e); }
+            finally { Loading = false; }
+            LastAttachMs = sw.ElapsedMilliseconds;
+            Debug.Log($"[RobotModels] loaded model in {LastAttachMs} ms");
             done?.Invoke(ok);
+        }
+
+        // 同一個顏色共用一個材質(原本每個零件各建一個,573 個零件 = 573+ 個材質,完全無法合批,是卡頓主因之一)
+        static readonly System.Collections.Generic.Dictionary<int, Material> matCache = new System.Collections.Generic.Dictionary<int, Material>();
+        static Material SharedMat(Color c)
+        {
+            int key = (Mathf.RoundToInt(c.r * 63f) << 12) | (Mathf.RoundToInt(c.g * 63f) << 6) | Mathf.RoundToInt(c.b * 63f);
+            if (!matCache.TryGetValue(key, out var m) || m == null) { m = FieldBuilder.MakeMat(c); matCache[key] = m; }
+            return m;
+        }
+
+        public static int LastDrawParts;   // 合併後的網格數(測試 / 除錯用)
+
+        // 把模型依材質合併成少數幾個大網格:數百個零件 → 每種顏色一個(超過 65k 頂點用 32 位元索引)。
+        // 合併後掛在 parent(ModelPivot)底下,慣性傾斜照常;讀不到頂點資料的網格(非 readable)保留原樣。
+        static void Merge(GameObject root, Transform parent)
+        {
+            var groups = new System.Collections.Generic.Dictionary<Material, System.Collections.Generic.List<CombineInstance>>();
+            var merged = new System.Collections.Generic.List<GameObject>();
+            Matrix4x4 toParent = parent.worldToLocalMatrix;
+            foreach (var mf in root.GetComponentsInChildren<MeshFilter>(true))
+            {
+                var mr = mf.GetComponent<MeshRenderer>();
+                var mesh = mf.sharedMesh;
+                if (mr == null || mesh == null || !mesh.isReadable || !mr.enabled || !mf.gameObject.activeInHierarchy) continue;
+                var mats = mr.sharedMaterials;
+                for (int i = 0; i < mesh.subMeshCount && i < mats.Length; i++)
+                {
+                    if (mats[i] == null) continue;
+                    if (!groups.TryGetValue(mats[i], out var list)) { list = new System.Collections.Generic.List<CombineInstance>(); groups[mats[i]] = list; }
+                    list.Add(new CombineInstance { mesh = mesh, subMeshIndex = i, transform = toParent * mf.transform.localToWorldMatrix });
+                }
+                merged.Add(mf.gameObject);
+            }
+            if (merged.Count == 0) { LastDrawParts = root.GetComponentsInChildren<Renderer>(true).Length; return; }
+            int parts = 0;
+            foreach (var kv in groups)
+            {
+                var m = new Mesh { name = "Merged_" + kv.Key.color, indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+                m.CombineMeshes(kv.Value.ToArray(), true, true);
+                m.RecalculateBounds();
+                var go = new GameObject(m.name);
+                go.transform.SetParent(parent, false);
+                go.AddComponent<MeshFilter>().sharedMesh = m;
+                var r = go.AddComponent<MeshRenderer>();
+                r.sharedMaterial = kv.Key;
+                r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                parts++;
+            }
+            foreach (var g in merged) g.SetActive(false);   // 原零件關掉(不刪,讀不到的網格仍顯示)
+            LastDrawParts = parts + root.GetComponentsInChildren<Renderer>(false).Length;
+            Debug.Log($"[RobotModels] merged {merged.Count} parts into {parts} meshes (draw parts now {LastDrawParts})");
         }
 
         static void Fix(GameObject root, Transform robot, float yawDeg)
         {
-            // 材質換成內建 Standard(保留 glTF 的基本色),避免 shader 被打包流程裁掉
+            // 材質換成內建 Standard(保留 glTF 的基本色),避免 shader 被打包流程裁掉;同色共用一個材質
             foreach (var r in root.GetComponentsInChildren<Renderer>(true))
             {
                 var mats = r.sharedMaterials;
@@ -99,7 +211,7 @@ namespace FrcSim
                         else if (m.HasProperty("_Color")) c = m.GetColor("_Color");
                     }
                     c.a = 1f;
-                    mats[i] = FieldBuilder.MakeMat(c);
+                    mats[i] = SharedMat(c);
                 }
                 r.sharedMaterials = mats;
                 r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
@@ -146,12 +258,12 @@ namespace FrcSim
             Vector3 target = new Vector3(robot.position.x, robot.position.y - SimConstants.BumperHeight / 2f, robot.position.z);
             root.transform.position += new Vector3(target.x - b.center.x, target.y - bottom, target.z - b.center.z);
 
+            // 擺好位置後再合併(合併時把位置一起烤進網格)
+            if (Array.IndexOf(Environment.GetCommandLineArgs(), "-nomerge") >= 0) { LastDrawParts = root.GetComponentsInChildren<Renderer>(false).Length; Debug.Log("[RobotModels] -nomerge: keeping " + LastDrawParts + " parts"); }
+            else try { Merge(root, root.transform.parent); } catch (Exception e) { Debug.LogWarning("[RobotModels] merge failed, keeping parts: " + e.Message); }
+
             // 隱藏內建方塊外觀
-            foreach (var n in new[] { "Body", "IntakeArm", "Turret" })
-            {
-                var t = robot.Find(n);
-                if (t != null) t.gameObject.SetActive(false);
-            }
+            HideBuiltin(robot);
         }
     }
 }

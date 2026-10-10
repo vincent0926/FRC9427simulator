@@ -110,6 +110,7 @@ public static class BuildTool
             if (File.Exists("Tools/sim/field/Field2026.glb")) { Directory.CreateDirectory(simDir + "/field"); File.Copy("Tools/sim/field/Field2026.glb", simDir + "/field/Field2026.glb", true); }
             if (Directory.Exists("Tools/sim/overlay")) { Directory.CreateDirectory(simDir + "/overlay"); foreach (var g in Directory.GetFiles("Tools/sim/overlay", "*.java")) File.Copy(g, simDir + "/overlay/" + Path.GetFileName(g), true);
                 if (Directory.Exists("Tools/sim/overlay/updateInputs")) { Directory.CreateDirectory(simDir + "/overlay/updateInputs"); foreach (var g in Directory.GetFiles("Tools/sim/overlay/updateInputs", "*.java")) File.Copy(g, simDir + "/overlay/updateInputs/" + Path.GetFileName(g), true); } }
+            if (Directory.Exists("Tools/sim/robot-example")) { Directory.CreateDirectory(simDir + "/robot-example"); foreach (var g in Directory.GetFiles("Tools/sim/robot-example", "*.java")) File.Copy(g, simDir + "/robot-example/" + Path.GetFileName(g), true); }
             if (File.Exists("Tools/sim/agent/simagent.jar")) File.Copy("Tools/sim/agent/simagent.jar", simDir + "/simagent.jar", true);
             // 依 mech.json 產生 agent 的馬達表:每行 id coderId ratio inertia friction invert min max
             foreach (var mj in Directory.GetFiles("Tools/sim", "*.mech.json"))

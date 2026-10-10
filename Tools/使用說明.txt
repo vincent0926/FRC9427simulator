@@ -26,6 +26,11 @@
 - H(按住):人類球員從 OUTPOST 球道放球(每場 24 顆,每 0.25 秒一顆);操作手手把 Y 也可以。第二台機器人(對面聯盟)的球道用 \ 鍵(右 Shift 是它的慢速)
 - N:跳過 AUTO(前 20 秒是自動階段:真實程式模式跑你程式自己的自動模式,內建模式跑內建自動路線;手把無效,按 N 直接進 TELEOP)
 - 起始站位:設定畫面「起始站位(自動階段)」選 Blue 1/2/3、Red 1/2/3;第二台機器人在對面聯盟同號站位跑鏡像路線。真實程式模式會把站位送進 DriverStation,程式用 DriverStation.getAlliance()/getLocation() 讀得到
+- 內建自動路線(沒跑真實程式時):設定畫面「內建自動路線」選 依站位 / 只射預載 / 預載+DEPOT / 預載+中立區(穿過 TRENCH)/ 不動
+- 真實程式模式的開賽前:程式連上後機器人先 Disabled,畫面上列出你程式的自動程式選單(SendableChooser / PathPlanner buildAutoChooser)。
+  [ / ] 或十字鍵左右 換選項,Tab 或十字鍵上下 換選單,Enter 或 A 開始比賽(20 秒後自動開始)。選項名稱和站位一樣(例如 Blue3)會自動選好
+- 機器人程式想從正確起點開始:把 Simobot-example\FrcSimPose.java 放進專案,autonomousInit 呼叫 FrcSimPose.startPose().ifPresent(drive::resetPose)
+- C:切換視角(跟隨 → 駕駛站 → 正上方 → 俯瞰);M:比賽提示音靜音;比賽結束會顯示成績單(AUTO / TELEOP / 總分)
 - C 切換視角,Esc 暫停,F1 按鍵說明,F3 詳細數據
 
 【注意】

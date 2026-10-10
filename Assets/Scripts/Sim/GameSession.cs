@@ -69,6 +69,7 @@ namespace FrcSim
             score = new GameObject("Score");
             score.AddComponent<HumanPlayer>();
             score.AddComponent<ScoreManager>();
+            score.AddComponent<MatchAudio>();   // 開賽 / TELEOP / 終局 / 結束提示音(M 靜音)
 
             Station = LegacyTestRun() ? 1 : ChosenStation();
             bool red = AutoPlan.IsRed(Station);

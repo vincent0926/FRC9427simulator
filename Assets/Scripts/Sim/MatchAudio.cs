@@ -52,7 +52,7 @@ namespace FrcSim
             if (!MenuSystem.Blocking && Input.GetKeyDown(KeyCode.M)) Muted = !Muted;
             if (!ScoreManager.ClockOn || ScoreManager.WaitingForCode) return;
             string ph = ScoreManager.Phase;
-            if (!started && ph == "AUTO") { started = true; Play(start); }
+            if (!started && (ph == "AUTO" || ph.StartsWith("SHIFT"))) { started = true; Play(start); lastPhase = ph; }   // 自由練習從 SHIFT 1 開始
             if (ph != lastPhase)
             {
                 if (lastPhase == "TRANSITION" && ph.StartsWith("SHIFT")) Play(teleop);

@@ -38,13 +38,18 @@ namespace FrcSim
         {
             x = y = deg = 0;
             if (CodePoseStamp == 0) return false;
+            if (CodePoseAgeMs > MaxCodePoseAgeMs) return false;   // 程式不再更新位姿:不要一直拉向最後一個舊位置
             double[] best = null;
             if (!Arrays.TryGetValue("Field/Robot", out best))
                 foreach (var kv in Arrays) if (kv.Key.EndsWith("/Robot") && kv.Value.Length >= 3) { best = kv.Value; break; }
             if (best == null || best.Length < 3) return false;
+            if (!IsFinite(best[0]) || !IsFinite(best[1]) || !IsFinite(best[2])) return false;   // 里程計算爆(NaN/無限大)
             x = best[0]; y = best[1]; deg = best[2];
             return true;
         }
+        public const long MaxCodePoseAgeMs = 500;
+        public long CodePoseAgeMs => NowMs - CodePoseStamp;
+        static bool IsFinite(double v) => !double.IsNaN(v) && !double.IsInfinity(v);
         public readonly ConcurrentDictionary<string, double[]> Arrays = new ConcurrentDictionary<string, double[]>();   // 例如 Field/Robot = 程式自己估的位姿 {x, y, 度}
 
         readonly ConcurrentDictionary<string, Chooser> choosers = new ConcurrentDictionary<string, Chooser>();

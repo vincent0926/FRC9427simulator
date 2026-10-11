@@ -14,6 +14,18 @@ namespace FrcSim
         public static AutoDrive Auto, Auto2;
         public static NtChooser Chooser;
         public static bool AutoOnly;            // 自動模式:只跑 AUTO(20 秒 + 3 秒計分寬限)就停,顯示 AUTO 成績
+        // 自由練習:完全不跑自動(沒有 AUTO、沒有開賽前選自動程式、第二台機器人也不自己跑),比賽計時直接從 TELEOP 開始。
+        // 要跑自動請用「自動模式」;-autotest / -realautotest 測試需要 AUTO,所以不算自由練習。
+        public static bool NoAuto
+        {
+            get
+            {
+                if (AutoOnly) return false;
+                var a = System.Environment.GetCommandLineArgs();
+                if (System.Array.IndexOf(a, "-freeplay") >= 0) return true;   // 測試:真實程式的自由練習
+                return System.Array.IndexOf(a, "-autotest") < 0 && System.Array.IndexOf(a, "-realautotest") < 0;
+            }
+        }
         static string lastProjectOverride;    // 內建自動路線(真實程式模式的玩家機器人沒有,自動程式由 Java 程式跑)
 
         static readonly Color BlueBody = new Color(0.15f, 0.35f, 0.9f), RedBody = new Color(0.9f, 0.2f, 0.2f);
@@ -103,7 +115,7 @@ namespace FrcSim
                 m2.Drive = d2; m2.RobotCollider = robot2.GetComponent<Collider>(); m2.TurretVisual = t2; m2.ArmVisual = a2;
                 m2.TargetHub = Hub(red2);
                 var in2 = robot2.AddComponent<Robot2Input>(); in2.Drive = d2; in2.Mech = m2;
-                if (!LegacyTestRun()) Auto2 = robot2.AddComponent<AutoDrive>();
+                if (!LegacyTestRun() && !NoAuto) Auto2 = robot2.AddComponent<AutoDrive>();
                 if (Auto2 != null) { Auto2.Drive = d2; Auto2.Mech = m2; Auto2.Station = st2; Auto2.Routine = ChosenRoutine(); }
             }
 
@@ -138,7 +150,13 @@ namespace FrcSim
                 Chooser.Drive = Drive; Chooser.Station = AutoPlan.Names[Station];
                 AutoPlan.StartPose(Station, out Chooser.StartX, out Chooser.StartY, out Chooser.StartDeg);
                 Chooser.Begin();
-                if (ScoreManager.ClockOn && !LegacyTestRun())
+                if (!LegacyTestRun() && NoAuto)
+                {
+                    // 自由練習:沒有選自動程式,但一樣要等馬達模擬就緒(程式啟動約 8 秒後)才 Enable,否則一開始推搖桿沒反應
+                    Hal.Enabled = false;
+                    var gate = robot.AddComponent<PreMatch>(); gate.Nt = Chooser; gate.FreePlay = true;
+                }
+                else if (ScoreManager.ClockOn && !LegacyTestRun() && !NoAuto)
                 {
                     Hal.Enabled = false;
                     robot.AddComponent<PreMatch>().Nt = Chooser;

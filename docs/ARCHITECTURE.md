@@ -30,7 +30,8 @@ Unity (HalSim.cs / MechSim.cs / NtSim.cs)
 - 設定畫面「起始站位」選 Blue 1/2/3 或 Red 1/2/3(或命令列 `-station blue1`)。藍方 1 號在場地 y 大的一側(藍方駕駛的左手邊);紅方 n 號是藍方 n 號繞場地中心旋轉 180° 的鏡像。
 - 起點:保險桿在起始線(聯盟區邊界)後 5 cm,車頭朝場內。第二台機器人放在對面聯盟的同號站位。
 - **真實程式模式**:站位送進 HALSim 的 DriverStation(`>station`),機器人程式用 `DriverStation.getAlliance()` / `getLocation()` 讀得到;比賽時鐘 AUTO 20 秒期間 DS 是 autonomous,跑的是機器人程式自己的自動程式。程式啟動中(還沒連上)時鐘暫停,連上後才從 AUTO 開始。
-- **自由練習**:玩家的車從開賽就由玩家操控(不跑內建自動);**第二台機器人**:跑 `AutoPlan.cs` 的內建路線(`AutoDrive.cs` 執行):倒退到射擊點 → 射完 8 顆預載;1 號站位再去 DEPOT 吃球、回來再射。AUTO 期間手把無效,按 N 跳過。
+- **自由練習完全不跑自動**:比賽計時直接從 TELEOP(SHIFT 1)開始,真實程式一連上就 TELEOP(沒有開賽前選自動程式),第二台機器人也不自己跑。要跑自動請用「自動模式」。
+- **自動模式 / 測試裡的第二台機器人**:跑 `AutoPlan.cs` 的內建路線(`AutoDrive.cs` 執行):倒退到射擊點 → 射完 8 顆預載;1 號站位再去 DEPOT 吃球、回來再射。AUTO 期間手把無效,按 N 跳過。
 - 內建路線可在設定畫面「內建自動路線」另外選(或 `-routine bystation|preload|depot|neutral|none`):依站位(1 號 DEPOT、其他只射預載)/ 只射預載 / 預載 + DEPOT / 預載 + 中立區(穿過 TRENCH 吃球、在中立區這側射)/ 不動。
 - **開賽前(真實程式模式)**:程式連上後先 Disabled,`NtChooser.cs` 從 NetworkTables 找 SmartDashboard 的自動程式選單(SendableChooser / PathPlanner / AdvantageKit 的 LoggedDashboardChooser 都是 "String Chooser"),畫面上用 [ / ] 或十字鍵換選項、Enter 或 A 開賽(有選單 20 秒、沒有 4 秒後自動開賽)。只會送清單內的選項(送不存在的名稱,`getSelected()` 會回傳 null)。上次選的會記住。
 - **起點位姿**:模擬器在 NetworkTables 發布 `/FRCSim/StartPose`、`/FRCSim/RobotPose`(double[] x, y, 航向度)、`/FRCSim/Station`。機器人程式放 `Tools/sim/robot-example/FrcSimPose.java`,在 autonomousInit 呼叫 `FrcSimPose.startPose().ifPresent(drive::resetPose)`,沒有視覺的機器人自動路線也會從正確的位置開始(上機時沒有值,不影響)。

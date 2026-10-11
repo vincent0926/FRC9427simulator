@@ -26,7 +26,42 @@ namespace FrcSim
             string chooserName = Arg("-chooser", "Auto Chooser");
             bool generic = chooserName != "Auto Chooser";   // 使用者自己的專案:沒有 SimTest/* 回報,只檢查選單與效能
             var hal = GameSession.Hal; var nt = GameSession.Chooser; var d = GameSession.Drive;
-            Check(hal != null && nt != null && PreMatch.I != null, "real-code mode with chooser client and pre-match");
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-freeplay") >= 0)
+            {
+                // 真實程式的自由練習:不進 autonomous、沒有開賽前、一連上就 TELEOP;沒按鍵不動、推搖桿會動
+                Check(hal != null && (PreMatch.I == null || PreMatch.I.FreePlay) && GameSession.Auto2 == null, "free practice: real code, no auto chooser, second robot has no auto");
+                float tf0 = Time.realtimeSinceStartup;
+                while (hal != null && !hal.Connected && hal.Starting && Time.realtimeSinceStartup - tf0 < 300f) yield return null;
+                Check(hal != null && hal.Connected, "robot code connected");
+                float tg = Time.realtimeSinceStartup;
+                while (PreMatch.I != null && !PreMatch.I.Done && Time.realtimeSinceStartup - tg < 40f) yield return null;
+                sb.AppendLine($"waited {Time.realtimeSinceStartup - tg:0.0} s for motor simulation, clock t={ScoreManager.MatchTime:0.0}");
+                yield return new WaitForSecondsRealtime(1f);
+                Check(hal.Enabled && !hal.Autonomous && ScoreManager.Phase.StartsWith("SHIFT"), $"robot code enabled in TELEOP right away (enabled={hal.Enabled} auto={hal.Autonomous} phase={ScoreManager.Phase})");
+                Pad.SetFake(true);
+                Vector2 fp0 = d.Pose2d;
+                yield return new WaitForSecondsRealtime(3f);
+                Check((d.Pose2d - fp0).magnitude < 0.1f, $"no input: robot stays (moved {(d.Pose2d - fp0).magnitude:0.00} m)");
+                fp0 = d.Pose2d;
+                string Diag()
+                {
+                    var msd = d.GetComponent<MechSim>();
+                    string cp = nt != null && nt.TryCodePose(out double qx, out double qy, out double qd) ? $"({qx:0.00},{qy:0.00},{qd:0})" : "-";
+                    return $"true=({d.Pose2d.x:0.00},{d.Pose2d.y:0.00},{d.HeadingRad * Mathf.Rad2Deg:0}) code={cp} axes1={hal.Axes[1]:0.00} axes5={hal.Axes[5]:0.00} ms[{(msd != null ? msd.Debug + " follow=" + msd.FollowingCode + " vel2=" + msd.Vel("Talon FX (v6)[2]").ToString("0") : "-")}]";
+                }
+                sb.AppendLine("before stick: " + Diag());
+                Pad.SetFake(true, ly: -1f, ry: -1f);   // 往後:3 號站位正前方是 TRENCH 立柱
+                yield return new WaitForSecondsRealtime(1.2f);
+                sb.AppendLine("during stick: " + Diag());
+                yield return new WaitForSecondsRealtime(1.3f);
+                Pad.SetFake(true);
+                Check((d.Pose2d - fp0).magnitude > 0.5f, $"stick drives the robot (moved {(d.Pose2d - fp0).magnitude:0.00} m)");
+                Pad.SetFake(false);
+                Finish(sb, ok);
+                yield break;
+            }
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-freeplay") < 0)
+                Check(hal != null && nt != null && PreMatch.I != null, "real-code mode with chooser client and pre-match");
             if (hal == null || nt == null || PreMatch.I == null) { Finish(sb, false); yield break; }
 
             float t0 = Time.realtimeSinceStartup;

@@ -116,7 +116,12 @@ namespace FrcSim
 
             // ---- 真實程式模式的開賽前:選自動程式
             var pm = PreMatch.I;
-            if (pm != null && pm.Active)
+            if (pm != null && pm.Active && pm.FreePlay)
+            {
+                Panel(new Rect(cx - 300, 90, 600, 30), 0.8f);
+                GUI.Label(new Rect(cx - 300, 93, 600, 26), L("等待馬達模擬就緒…(機器人程式啟動後約 10 秒,之後就能開車)", "Waiting for motor simulation… (~10 s after the robot code starts)"), Style(15, new Color(1f, 0.9f, 0.4f), TextAnchor.UpperCenter, FontStyle.Bold));
+            }
+            else if (pm != null && pm.Active)
             {
                 var list = pm.Nt != null ? pm.Nt.Choosers : new System.Collections.Generic.List<NtChooser.Chooser>();
                 float ph = 66 + list.Count * 24;

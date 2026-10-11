@@ -62,6 +62,7 @@ namespace FrcSim
         [System.Runtime.InteropServices.DllImport("winmm.dll")] static extern uint timeBeginPeriod(uint ms);
 
         bool agentActive;
+        float lastFollowLog = -10f;
         bool followCodePose = true;   // mech.json chassis.followCodePose(預設開)
         double gyroYawDeg; float enabledAt = -1f;
         public bool FollowingCode { get; private set; }
@@ -310,8 +311,10 @@ namespace FrcSim
             if (!autoNow && nt != null) nt.ClearPathTarget();
             bool havePath = autoNow && nt != null && nt.TryPathTarget(out tx, out ty, out tdeg);
             if (!Hal.Enabled) enabledAt = -1f; else if (enabledAt < 0f) enabledAt = Time.time;
-            // 沒有 PathPlanner 目標時才用程式估的位姿,而且要啟用 0.5 秒後(開賽瞬間程式的位姿常常還沒重置,會把車拖走)
-            bool haveTarget = havePath || (nt != null && enabledAt >= 0f && Time.time - enabledAt > 0.5f && (!autoNow || !nt.SawPathPlanner) && nt.TryCodePose(out tx, out ty, out tdeg));
+            // 只有 AUTO 才跟隨:沒有 PathPlanner 目標時用程式估的位姿,而且要啟用 0.5 秒後(開賽瞬間程式的位姿常常還沒重置,會把車拖走)。
+            // TELEOP 不跟隨:程式的里程計不知道碰撞(被牆/BUMP/球擋住),跟隨會把車拉向「穿牆的位姿」造成亂動;
+            // 改用下面模組速度的物理,車子的實際位置由剛體決定,程式位姿偏掉也不影響操控。
+            bool haveTarget = havePath || (autoNow && nt != null && enabledAt >= 0f && Time.time - enabledAt > 0.5f && !nt.SawPathPlanner && nt.TryCodePose(out tx, out ty, out tdeg));
             if (followCodePose && Hal.Enabled && haveTarget)
             {
                 const float tau = 0.1f;
@@ -322,6 +325,15 @@ namespace FrcSim
                 Drive.SimDriven = true;
                 Drive.SimVelField = vf;
                 Drive.SimOmega = Mathf.Clamp(herr / tau, -12f, 12f);
+                // 診斷:跟隨誤差大或每 2 秒記一次,方便從 Player.log 看出亂動前位姿怎麼飄(除錯用)
+                if (err.magnitude > 0.5f || Mathf.Abs(herr) > 0.5f || Time.time - lastFollowLog > 2f)
+                {
+                    if (Time.time - lastFollowLog > 0.25f)
+                    {
+                        lastFollowLog = Time.time;
+                        UnityEngine.Debug.Log($"[Follow] t={Time.time:0.0} src={(havePath ? "path" : "code")} auto={autoNow} target=({tx:0.00},{ty:0.00},{tdeg:0}) sim=({Drive.Pose2d.x:0.00},{Drive.Pose2d.y:0.00},{Drive.HeadingRad * Mathf.Rad2Deg:0}) err={err.magnitude:0.00}m herr={herr * Mathf.Rad2Deg:0}deg cmd=({vf.x:0.0},{vf.y:0.0}) chassis=({cvx:0.00},{cvy:0.00},w={omega:0.00}) hits={n} poseAge={nt.CodePoseAgeMs}ms");
+                    }
+                }
                 Debug += $" follow {(havePath ? "path" : "code")}=({tx:0.00},{ty:0.00},{tdeg:0})";
                 FollowingCode = true;
                 FollowSource = havePath ? "PathPlanner" : "Field2d";

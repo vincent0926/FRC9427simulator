@@ -63,6 +63,7 @@ namespace FrcSim
             BlueScore = RedScore = 0; BlueAuto = RedAuto = 0;
             MatchTime = 0f; Ended = false; BlueWonAuto = true;
             ClockOn = GameSession.AutoOnly || (PlayerPrefs.GetInt("matchClock", 1) == 1 && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-noclock") < 0);
+            if (ClockOn && GameSession.NoAuto) MatchTime = 30f;   // 自由練習:跳過 AUTO 與過渡期,直接從 TELEOP(SHIFT 1)開始
             float L = SimConstants.FieldLength, W = SimConstants.FieldWidth;
             float d = SimConstants.AllianceZoneDepth + SimConstants.HubSize / 2f;
             blueHub = new Vector2(d, W / 2f);

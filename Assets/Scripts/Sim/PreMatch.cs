@@ -9,6 +9,7 @@ namespace FrcSim
     public class PreMatch : MonoBehaviour
     {
         public static PreMatch I;
+        public bool FreePlay;   // 自由練習:不選自動程式,馬達模擬就緒就直接開始(TELEOP)
         public NtChooser Nt;
         public float AutoStartSeconds = 20f, NoChooserSeconds = 10f;   // 程式常在連上幾秒後才把選單放上 SmartDashboard,太短會在選單出現前就開賽
         public string StartInfo = "";   // HUD 用:機器人擺在哪個起點
@@ -80,7 +81,8 @@ namespace FrcSim
                 return;
             }
             hal.Enabled = false;
-            if (connectedAt < 0f && (Nt == null || Nt.Connected)) connectedAt = Time.unscaledTime;   // 倒數從 NetworkTables 連上才開始
+            if (connectedAt < 0f && (Nt == null || Nt.Connected)) connectedAt = Time.unscaledTime;
+            if (FreePlay) { if (connectedAt < 0f) connectedAt = Time.unscaledTime; startRequested = true; if (MotorsReady()) StartNow(); return; }   // 倒數從 NetworkTables 連上才開始
             if (ScoreManager.MatchTime >= 30f) { StartNow(); return; }   // 按了 N 跳過 AUTO
             if (startRequested) { if (MotorsReady()) StartNow(); return; }
 

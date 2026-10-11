@@ -27,10 +27,10 @@
                   }
               ],
     "loads":  {
-                  "[46]":  { "inertia": 0.002, "friction": 0.01, "lead": 0.04, "note": "steer FR" },
-                  "[3]":  { "inertia": 0.002, "friction": 0.01, "lead": 0.04, "note": "steer BR" },
-                  "[7]":  { "inertia": 0.002, "friction": 0.01, "lead": 0.04, "note": "steer BL" },
-                  "[5]":  { "inertia": 0.002, "friction": 0.01, "lead": 0.04, "note": "steer FL" },
+                  "[46]":  { "inertia": 0.0001, "friction": 0.01, "lead": 0.04, "note": "steer FR" },
+                  "[3]":  { "inertia": 0.0001, "friction": 0.01, "lead": 0.04, "note": "steer BR" },
+                  "[7]":  { "inertia": 0.0001, "friction": 0.01, "lead": 0.04, "note": "steer BL" },
+                  "[5]":  { "inertia": 0.0001, "friction": 0.01, "lead": 0.04, "note": "steer FL" },
                   "[31]":  {
                                "inertia":  0.0036500000000000005,
                                "friction":  0.005,

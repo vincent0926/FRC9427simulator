@@ -146,6 +146,11 @@ namespace FrcSim
                     sb.AppendLine("timeline:" + tl);
                     Check(nDev > 10 && sumDev / Mathf.Max(1, nDev) < 0.35f && maxDev < 1.0f, "robot follows the PathPlanner route (avg < 0.35 m, max < 1.0 m)");
                 }
+                // 程式自己的里程計(Field/Robot)和真實位置差多少:差太多代表馬達模擬(轉向、驅動)回授不像真的,程式的路線 PID 會越追越偏
+                float sumC = 0f, maxC = 0f; int nC = 0;
+                foreach (var smp in samples) if (smp.HasC) { float e = Vector2.Distance(smp.P, smp.C); sumC += e; maxC = Mathf.Max(maxC, e); nC++; }
+                sb.AppendLine($"code odometry vs true pose: samples={nC} avg={(nC > 0 ? sumC / nC : 0):0.00} m, max={maxC:0.00} m");
+                Warn2(nC == 0 || sumC / nC < 1.0f, "robot code's own pose stays near the true pose (avg < 1.0 m)");
                 sb.AppendLine("trace: " + trace);
                 Warn2(maxMove > 0.5f, "robot drove during the user's auto");
                 Check(ScoreManager.Ended && ScoreManager.Phase == "AUTO DONE" && !hal.Enabled, $"auto mode ends after AUTO (phase={ScoreManager.Phase}, t={ScoreManager.MatchTime:0.0}, enabled={hal.Enabled})");

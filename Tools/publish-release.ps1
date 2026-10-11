@@ -23,7 +23,7 @@ $cs = Get-Content (Join-Path $root 'Assets\Scripts\Sim\UpdateCheck.cs') -Raw
 if ($cs -notmatch "Current = `"$([regex]::Escape($Version))`"") { throw "UpdateCheck.cs 的 Current 不是 $Version,先改好再重新打包。" }
 
 # 1. 暫存要發佈的檔案(排除測試輸出與 log)
-robocopy $build $stage /E /XF padtest.txt selftest.txt leotest.txt halsimtest.txt realtest.txt fieldtest.txt balltest.txt walltest.txt autotest.txt realautotest.txt settletest.txt soaktest.txt outpostdump.txt *.log /XD logs _update /NFL /NDL /NJH /NJS | Out-Null
+robocopy $build $stage /E /XF padtest.txt selftest.txt leotest.txt halsimtest.txt realtest.txt fieldtest.txt balltest.txt walltest.txt autotest.txt realautotest.txt settletest.txt soaktest.txt freetest.txt menutest.txt shottest.txt outpostdump.txt *.log /XD logs _update /NFL /NDL /NJH /NJS | Out-Null
 Copy-Item (Join-Path $root 'Tools\使用說明.txt') (Join-Path $stage '使用說明.txt') -Force
 
 # 2. 這一版的 manifest
